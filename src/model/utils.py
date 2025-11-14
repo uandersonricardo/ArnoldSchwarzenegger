@@ -1,8 +1,10 @@
-import torch
-import torch.nn as nn
-from torch.autograd import Variable
 from logging import getLogger
-from .bucketed_embedding import BucketedEmbedding
+
+import torch
+from torch import nn
+from torch.autograd import Variable
+
+from src.model.bucketed_embedding import BucketedEmbedding
 
 
 logger = getLogger()
@@ -32,8 +34,8 @@ def value_loss(delta):
         return nn.SmoothL1Loss()
     else:
         # Huber Loss
-        def loss_fn(input, target):
-            diff = (input - target).abs()
+        def loss_fn(inp, target):
+            diff = (inp - target).abs()
             diff_delta = diff.cmin(delta)
             loss = diff_delta * (diff - diff_delta / 2)
             return loss.mean()
@@ -56,7 +58,7 @@ def build_CNN_network(module, params):
         in_channels = params.n_fm * params.hist_size
     height = params.height
     width = params.width
-    logger.info('Input shape: %s' % str((params.n_fm, height, width)))
+    logger.info('Input shape: %s', str((params.n_fm, height, width)))
 
     # convolutional layers
     module.conv = nn.Sequential(*filter(bool, [

@@ -1,15 +1,15 @@
 import importlib
 import argparse
+
 import torch.multiprocessing as mp
 
-# Arnold
-from ...parameter_server import ParameterServer
+from src.parameter_server import ParameterServer
 
 
-def worker_fn_factory(main):
+def worker_fn_factory(fn):
     def worker_fn(rank, parser, args, param_server):
         param_server.set_rank(rank)
-        main(parser, args, parameter_server=param_server)
+        fn(parser, args, parameter_server=param_server)
     return worker_fn
 
 

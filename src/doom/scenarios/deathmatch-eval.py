@@ -1,17 +1,16 @@
 import os
 import json
-import torch
 import pickle
 from logging import getLogger
 
+import torch
 
-# Arnold
-from ...utils import set_num_threads, get_device_mapping, bool_flag
-from ...model import register_model_args, get_model_class
-from ...args import finalize_args
-from ..game_features import GameFeaturesConfusionMatrix
-from ..game import Game
-from ..actions import ActionBuilder
+from src.utils import set_num_threads, get_device_mapping, bool_flag
+from src.model import register_model_args, get_model_class
+from src.args import finalize_args
+from src.doom.game_features import GameFeaturesConfusionMatrix
+from src.doom.game import Game
+from src.doom.actions import ActionBuilder
 
 
 logger = getLogger()
@@ -118,7 +117,7 @@ def main(parser, args, parameter_server=None):
 
     def reload_model(path):
         assert os.path.isfile(path)
-        logger.info('Reloading model from %s...' % path)
+        logger.info('Reloading model from %s...', path)
         model_path = os.path.join(params.dump_path, path)
         map_location = get_device_mapping(params.gpu_id)
         reloaded = torch.load(model_path, map_location=map_location)
@@ -127,7 +126,7 @@ def main(parser, args, parameter_server=None):
     model_ids = [x for x in params.eval_model_ids.split(',') if len(x) > 0]
     scores = {}
     for model_id in model_ids:
-        logger.info("====================== Evaluating %s ======================" % model_id)
+        logger.info("====================== Evaluating %s ======================", model_id)
         model_path = os.path.join(params.eval_model_path, model_id)
         logger.info(model_path)
         reload_model(model_path)
@@ -143,14 +142,16 @@ def evaluate_deathmatch(game, network, params, n_train_iter=None):
     logger.info('Evaluating the model...')
     game.statistics = {}
 
+    confusion = None
     n_features = params.n_features
+
     if n_features > 0:
         confusion = GameFeaturesConfusionMatrix(params.map_ids_test, n_features)
 
     # evaluate on every test map
     for map_id in params.map_ids_test:
 
-        logger.info("Evaluating on map %i ..." % map_id)
+        logger.info("Evaluating on map %i ...", map_id)
         game.start(map_id=map_id, log_events=False)
         game.randomize_textures(False)
         game.init_bots_health(100)
@@ -168,7 +169,7 @@ def evaluate_deathmatch(game, network, params, n_train_iter=None):
                 network.reset()
 
             while game.is_player_dead():
-                logger.warning('Player %i is still dead after respawn.' %
+                logger.warning('Player %i is still dead after respawn.',
                                params.player_rank)
                 game.respawn_player()
 
@@ -192,7 +193,7 @@ def evaluate_deathmatch(game, network, params, n_train_iter=None):
 
         # close the game
         game.close()
-        logger.info("%i iterations" % n_iter)
+        logger.info("%i iterations", n_iter)
 
     # log the statistics
     if n_features != 0:
@@ -202,7 +203,7 @@ def evaluate_deathmatch(game, network, params, n_train_iter=None):
     to_log = {k: game.statistics['all'][k] for k in to_log}
     if n_train_iter is not None:
         to_log['n_iter'] = n_train_iter
-    logger.info("__log__:%s" % json.dumps(to_log))
+    logger.info("__log__:%s", json.dumps(to_log))
 
     # evaluation score
     return game.statistics['all']

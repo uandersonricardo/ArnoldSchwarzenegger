@@ -4,16 +4,14 @@ import math
 from logging import getLogger
 from collections import namedtuple
 
-# ViZDoom library
 from vizdoom import DoomGame, GameVariable
 from vizdoom import ScreenResolution, ScreenFormat, Mode
 
-# Arnold
-from .utils import process_buffers
-from .reward import RewardBuilder
-from .actions import add_buttons
-from .labels import parse_labels_mapping
-from .game_features import parse_game_features
+from src.doom.utils import process_buffers
+from src.doom.reward import RewardBuilder
+from src.doom.actions import add_buttons
+from src.doom.labels import parse_labels_mapping
+from src.doom.game_features import parse_game_features
 
 
 RESOURCES_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'resources')
@@ -128,6 +126,22 @@ class Game(object):
         self.scenario_path = os.path.join(RESOURCES_DIR, 'scenarios', '%s.wad' % scenario)
         self.game_path = os.path.join(RESOURCES_DIR, game_filename)
 
+        # initialize parameters
+        self.args = None
+        self.prev_properties = None
+        self.properties = None
+        self.manual_control = None
+        self.episode_time = None
+        self.game = None
+        self.map_id = None
+        self.log_events = None
+        self.params = None
+        self.mapping = None
+        self._screen_buffer = None
+        self._depth_buffer = None
+        self._labels_buffer = None
+        self._labels = None
+
         # check parameters
         assert os.path.isfile(self.scenario_path)
         assert os.path.isfile(self.game_path)
@@ -139,7 +153,7 @@ class Game(object):
         assert not (render_minimal_hud and not render_hud)
         assert len(name.strip()) > 0 and color in range(8)
         assert n_bots >= 0
-        assert (type(use_scripted_marines) is bool or
+        assert (isinstance(use_scripted_marines, bool) or
                 use_scripted_marines is None and n_bots == 0)
         assert 0 <= doom_skill <= 4
         assert 0 < players_per_game
@@ -360,7 +374,8 @@ class Game(object):
             if self.prev_properties[weapon] == self.properties[weapon]:
                 continue
             # assert(self.prev_properties[weapon] == 0 and  # TODO check
-            #        self.properties[weapon] == 1), (weapon, self.prev_properties[weapon], self.properties[weapon])
+            #        self.properties[weapon] == 1), (weapon, self.prev_properties[weapon],
+            #                                                self.properties[weapon])
             self.reward_builder.weapon()
             stats[weapon] += 1
             self.log('Found weapon: %s' % WEAPON_NAMES[i + 1])
@@ -394,7 +409,7 @@ class Game(object):
         Start the game.
         If `episode_time` is given, the game will end after the specified time.
         """
-        assert type(manual_control) is bool
+        assert isinstance(manual_control, bool)
         self.manual_control = manual_control
 
         # Save statistics for this map
@@ -515,8 +530,7 @@ class Game(object):
 
         # deal with a ViZDoom issue
         while self.is_player_dead():
-            logger.warning('Player %i is still dead after respawn.' %
-                           self.params.player_rank)
+            logger.warning('Player %i is still dead after respawn.', self.params.player_rank)
             self.respawn_player()
 
     def update_bots(self):
@@ -601,7 +615,7 @@ class Game(object):
         """
         Randomize the textures of the map.
         """
-        assert type(randomize) is bool
+        assert isinstance(randomize, bool)
         randomize = 1 if randomize else 0
         self.game.send_game_command("pukename set_value always 4 %i" % randomize)
 
@@ -644,6 +658,8 @@ class Game(object):
             self.count_non_turn_actions = 0
         else:
             self.count_non_turn_actions += 1
+
+        manual_repeat = 0
 
         if self.manual_control and (self.count_non_forward_actions >= 30 or self.count_non_turn_actions >= 60):
             manual_action = [False] * len(action)
@@ -738,7 +754,7 @@ class Game(object):
                 eval_minutes = eval_time / 60
                 if k == 'all':
                     eval_minutes *= (len(self.statistics) - 1)
-                respawn_time = (v['deaths'] * RESPAWN_SECONDS * 1.0 / 60)
+                respawn_time = v['deaths'] * RESPAWN_SECONDS * 1.0 / 60
                 v['frags_pm'] = v['frags'] * 1.0 / eval_minutes
                 v['frags_pm_r'] = v['frags'] * 1.0 / (eval_minutes + respawn_time)
 
@@ -782,7 +798,7 @@ class Game(object):
             if line is None:
                 logger.info('')
             else:
-                if type(line) is tuple:
+                if isinstance(line, tuple):
                     assert len(line) == 2
                     name, k = line
                     if k in ['frags_pm', 'frags_pm_r'] and eval_time is None:
@@ -790,9 +806,9 @@ class Game(object):
                     line = ['%s:' % name]
                     line += [self.statistics[map_id][k] for map_id in map_ids]
                 else:
-                    assert type(line) is list
+                    assert isinstance(line, list)
                     line = line[:len(map_ids) + 1]
-                line = ['%.3f' % x if type(x) is float else x for x in line]
+                line = ['%.3f' % x if isinstance(x, float) else x for x in line]
                 logger.info(log_pattern.format(*line))
 
     def observe_state(self, params, last_states):
@@ -813,3 +829,15 @@ class Game(object):
 
         # return the screen and the game features
         return screen, game_features
+
+    def get_screen_resolution(self):
+        """
+        Return the screen resolution (channels, width, height).
+        """
+        return (self.game.get_screen_channels(), self.game.get_screen_width(), self.game.get_screen_height())
+
+    def get_number_of_actions(self):
+        """
+        Return the number of available actions.
+        """
+        return self.action_builder.get_number_of_actions()

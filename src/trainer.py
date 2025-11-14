@@ -1,10 +1,11 @@
-import torch
 import os
-import numpy as np
 from logging import getLogger
 
-from .utils import get_optimizer
-from .replay_memory import ReplayMemory
+import torch
+import numpy as np
+
+from src.utils import get_optimizer
+from src.replay_memory import ReplayMemory
 
 
 logger = getLogger()
@@ -26,7 +27,7 @@ class Trainer(object):
 
     def start_game(self):
         map_id = np.random.choice(self.params.map_ids_train)
-        logger.info("Training on map %i ..." % map_id)
+        logger.info("Training on map %i ...", map_id)
         self.game.start(map_id=map_id,
                         episode_time=self.params.episode_time,
                         log_events=False,
@@ -97,7 +98,7 @@ class Trainer(object):
 
             # log current average loss
             if self.n_iter % (log_frequency * update_frequency) == 0:
-                logger.info('=== Iteration %i' % self.n_iter)
+                logger.info('=== Iteration %i', self.n_iter)
                 self.network.log_loss(current_loss)
                 current_loss = self.network.new_loss_history()
 
@@ -142,10 +143,10 @@ class Trainer(object):
                                  self.params, self.n_iter)
         if new_score > self.best_score:
             self.best_score = new_score
-            logger.info('New best score: %f' % self.best_score)
+            logger.info('New best score: %f', self.best_score)
             model_name = 'best-%i.pth' % (self.n_iter - start_iter)
             model_path = os.path.join(self.params.dump_path, model_name)
-            logger.info('Best model dump: %s' % model_path)
+            logger.info('Best model dump: %s', model_path)
             torch.save(self.network.module.state_dict(), model_path)
         self.network.module.train()
         self.start_game()
@@ -153,7 +154,7 @@ class Trainer(object):
     def dump_model(self, start_iter):
         model_name = 'periodic-%i.pth' % (self.n_iter - start_iter)
         model_path = os.path.join(self.params.dump_path, model_name)
-        logger.info('Periodic dump: %s' % model_path)
+        logger.info('Periodic dump: %s', model_path)
         torch.save(self.network.module.state_dict(), model_path)
 
     def sync_update_parameters(self):

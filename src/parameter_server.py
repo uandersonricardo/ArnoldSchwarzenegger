@@ -9,6 +9,7 @@ class ParameterServer(object):
         self.lock = mp.Lock()
         self.n_processes = n_processes
         self.params = None
+        self.rank = None
 
     def __getstate__(self):
         return (self.queue, self.lock)
@@ -27,7 +28,7 @@ class ParameterServer(object):
             # TODO: needs urgent fix
             # for param in self.params.values():
             #     param.grad
-            for i in range(self.n_processes - 1):
+            for _ in range(self.n_processes - 1):
                 self.queue.put(self.params)
         else:
             self.params = self.queue.get()

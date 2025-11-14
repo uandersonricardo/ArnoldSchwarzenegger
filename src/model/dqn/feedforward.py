@@ -1,7 +1,8 @@
 import torch
-import torch.nn as nn
+from torch import nn
 from torch.autograd import Variable
-from .base import DQNModuleBase, DQN
+
+from src.model.dqn.base import DQNModuleBase, DQN
 
 
 class DQNModuleFeedforward(DQNModuleBase):
@@ -20,7 +21,7 @@ class DQNModuleFeedforward(DQNModuleBase):
             - x_variables list of n_var tensors of shape (batch_size,)
         """
 
-        batch_size = x_screens.size(0)
+        # batch_size = x_screens.size(0)
 
         for x in x_variables:
             x.unsqueeze_(0)

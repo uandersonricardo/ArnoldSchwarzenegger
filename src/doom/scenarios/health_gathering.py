@@ -1,19 +1,18 @@
 import os
 import json
-import torch
 import pickle
-import numpy as np
 from logging import getLogger
 
+import numpy as np
+import torch
 
-# Arnold
-from ...utils import set_num_threads, get_device_mapping, bool_flag
-from ...model import register_model_args, get_model_class
-from ...trainer import ReplayMemoryTrainer
-from ...args import finalize_args
-from ..game_features import GameFeaturesConfusionMatrix
-from ..game import Game
-from ..actions import ActionBuilder
+from src.utils import set_num_threads, get_device_mapping, bool_flag
+from src.model import register_model_args, get_model_class
+from src.trainer import ReplayMemoryTrainer
+from src.args import finalize_args
+from src.doom.game_features import GameFeaturesConfusionMatrix
+from src.doom.game import Game
+from src.doom.actions import ActionBuilder
 
 
 logger = getLogger()
@@ -84,7 +83,7 @@ def main(parser, args, parameter_server=None):
     # Network initialization and optional reloading
     network = get_model_class(params.network_type)(params)
     if params.reload:
-        logger.info('Reloading model from %s...' % params.reload)
+        logger.info('Reloading model from %s...', params.reload)
         model_path = os.path.join(params.dump_path, params.reload)
         map_location = get_device_mapping(params.gpu_id)
         reloaded = torch.load(model_path, map_location=map_location)
@@ -118,6 +117,8 @@ def evaluate_health_gathering(game, network, params, n_train_iter=None):
     game.start(map_id=map_id, episode_time=params.episode_time, log_events=True)
     network.reset()
     network.module.eval()
+
+    gf_confusion = None
     n_features = params.n_features
 
     n_iter = 0
@@ -132,7 +133,7 @@ def evaluate_health_gathering(game, network, params, n_train_iter=None):
         if game.is_player_dead() or game.is_episode_finished():
             # store the number of kills
             survival_time.append(game.game.get_episode_time())
-            logger.info("Survived for %i steps." % game.game.get_episode_time())
+            logger.info("Survived for %i steps.", game.game.get_episode_time())
             logger.info("===============")
             if len(survival_time) == params.eval_episodes:
                 break
@@ -160,17 +161,17 @@ def evaluate_health_gathering(game, network, params, n_train_iter=None):
     game.close()
 
     # log the number of iterations and statistics
-    logger.info("%i iterations on %i episodes." % (n_iter, len(survival_time)))
+    logger.info("%i iterations on %i episodes.", n_iter, len(survival_time))
     if n_features != 0:
         gf_confusion.print_statistics()
-    logger.info("Survival time by episode: %s" % str(survival_time))
-    logger.info("%f survival time / episode average." % np.mean(survival_time))
+    logger.info("Survival time by episode: %s", str(survival_time))
+    logger.info("%f survival time / episode average.", np.mean(survival_time))
     to_log = {'min_survival_time': float(np.min(survival_time)),
               'max_survival_time': float(np.max(survival_time)),
               'mean_survival_time': float(np.mean(survival_time))}
     if n_train_iter is not None:
         to_log['n_iter'] = n_train_iter
-    logger.info("__log__:%s" % json.dumps(to_log))
+    logger.info("__log__:%s", json.dumps(to_log))
 
     # evaluation score
     return np.mean(survival_time)

@@ -1,7 +1,7 @@
-import numpy as np
 import cv2
+import numpy as np
 
-from .labels import get_label_type_id, parse_labels_mapping
+from src.doom.labels import get_label_type_id, parse_labels_mapping
 
 
 def process_buffers(game, params):

@@ -5,6 +5,7 @@ import random
 import inspect
 import argparse
 import subprocess
+
 import torch
 from torch import optim
 
@@ -63,7 +64,7 @@ def get_optimizer(s):
         for x in s[s.find(',') + 1:].split(','):
             split = x.split('=')
             assert len(split) == 2
-            assert re.match("^[+-]?(\d+(\.\d*)?|\.\d+)$", split[1]) is not None
+            assert re.match(r"^[+-]?(\d+(\.\d*)?|\.\d+)$", split[1]) is not None
             optim_params[split[0]] = float(split[1])
     else:
         method = s
@@ -90,7 +91,7 @@ def get_optimizer(s):
         raise Exception('Unknown optimization method: "%s"' % method)
 
     # check that we give good parameters to the optimizer
-    expected_args = inspect.getargspec(optim_fn.__init__)[0]
+    expected_args = inspect.getfullargspec(optim_fn.__init__)[0]
     assert expected_args[:2] == ['self', 'params']
     if not all(k in expected_args[2:] for k in optim_params.keys()):
         raise Exception('Unexpected parameters: expected "%s", received "%s"' %
@@ -104,12 +105,16 @@ def get_dump_path(main_dump_path, exp_name):
     Create a directory to store the experiment.
     """
     assert len(exp_name) > 0
+
     # create the sweep path if it does not exist
     if not os.path.isdir(main_dump_path):
         subprocess.Popen("mkdir %s" % main_dump_path, shell=True).wait()
+
     sweep_path = os.path.join(main_dump_path, exp_name)
+
     if not os.path.exists(sweep_path):
         subprocess.Popen("mkdir %s" % sweep_path, shell=True).wait()
+
     # randomly generate a experiment ID
     chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
     while True:
@@ -117,9 +122,11 @@ def get_dump_path(main_dump_path, exp_name):
         dump_path = os.path.join(sweep_path, folder_name)
         if not os.path.isdir(dump_path):
             break
+
     # create the dump folder
     if not os.path.isdir(dump_path):
         subprocess.Popen("mkdir %s" % dump_path, shell=True).wait()
+
     return dump_path
 
 

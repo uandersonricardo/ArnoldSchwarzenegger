@@ -1,8 +1,9 @@
 import torch
 from torch.autograd import Variable
-from .base import DQNModuleBase, DQN
-from ..utils import get_recurrent_module
-from ...utils import bool_flag
+
+from src.utils import bool_flag
+from src.model.utils import get_recurrent_module
+from src.model.dqn.base import DQNModuleBase, DQN
 
 
 class DQNModuleRecurrent(DQNModuleBase):
@@ -60,6 +61,7 @@ class DQNRecurrent(DQN):
 
     def __init__(self, params):
         super(DQNRecurrent, self).__init__(params)
+        self.prev_state = None
         h_0 = torch.FloatTensor(params.n_rec_layers, params.batch_size,
                                 params.hidden_dim).zero_()
         self.init_state_t = self.get_var(h_0)

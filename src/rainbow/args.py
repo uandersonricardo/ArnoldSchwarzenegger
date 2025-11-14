@@ -1,17 +1,17 @@
-import os
 import argparse
-import importlib
 
 from src.utils import bool_flag, map_ids_flag, bcast_json_list
 from src.doom.utils import get_n_feature_maps
 from src.doom.game_features import parse_game_features
 
+def parse_game_args():
+    parser = argparse.ArgumentParser(description='Arnold Schwarzenegger')
 
-def parse_game_args(args):
-    """
-    Parse global game parameters.
-    """
-    parser = argparse.ArgumentParser(description='Doom parameters')
+    # Experiment name / dump path
+    parser.add_argument("--main_dump_path", type=str, default="./dumped",
+                        help="Main dump path")
+    parser.add_argument("--exp_name", type=str, default="default",
+                        help="Experiment name")
 
     # Doom scenario / map ID
     parser.add_argument("--scenario", type=str, default="deathmatch",
@@ -96,29 +96,26 @@ def parse_game_args(args):
     parser.add_argument("--log_frequency", type=int, default=100,
                         help="Log frequency (in seconds)")
 
-    # Parse known arguments
-    params, _ = parser.parse_known_args(args)
+    # Scenario specific arguments
+    parser.add_argument("--wad", type=str, default="",
+                        help="WAD scenario filename")
+    parser.add_argument("--n_bots", type=int, default=8,
+                        help="Number of ACS bots in the game")
+    parser.add_argument("--reward_values", type=str, default="",
+                        help="reward_values")
+    parser.add_argument("--randomize_textures", type=bool_flag, default=False,
+                        help="Randomize textures during training")
+    parser.add_argument("--init_bots_health", type=int, default=100,
+                        help="Initial bots health during training")
 
-    # check parameters
-    assert len(params.dump_path) > 0 and os.path.isdir(params.dump_path)
-    assert len(params.scenario) > 0
-    assert params.freelook ^ ('look_ud' not in params.action_combinations)
-    assert set([params.speed, params.crouch]).issubset(['on', 'off', 'manual'])
-    assert not params.visualize or params.evaluate
-    assert not params.human_player or params.evaluate and params.visualize
-    assert not params.evaluate or params.reload
-    assert not params.reload or os.path.isfile(params.reload)
+    params = parser.parse_args()
 
-    # run scenario game
-    module = importlib.import_module('src.doom.scenarios.' + params.scenario,
-                                     package=__name__)
-    module.main(parser, args)
+    params.human_player = params.human_player and params.player_rank == 0
 
+    # Game variables / Game features / feature maps
+    params.game_variables = [('health', 101), ('sel_ammo', 301)]
 
-def finalize_args(params):
-    """
-    Finalize parameters.
-    """
+    # Finalize args
     params.n_variables = len(params.game_variables)
     params.n_features = sum(parse_game_features(params.game_features))
     params.n_fm = get_n_feature_maps(params)
@@ -128,3 +125,10 @@ def finalize_args(params):
 
     if not hasattr(params, 'use_continuous'):
         params.use_continuous = False
+
+    # Training / Evaluation parameters
+    params.episode_time = None  # episode maximum duration (in seconds)
+    params.eval_freq = 20000    # time (in iterations) between 2 evaluations
+    params.eval_time = 900      # evaluation time (in seconds)
+
+    return params

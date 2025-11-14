@@ -1,12 +1,13 @@
-import numpy as np
-import torch
-import torch.nn as nn
-from torch.autograd import Variable
 from logging import getLogger
 
-from ...utils import bool_flag
-from ..utils import value_loss, build_CNN_network
-from ..utils import build_game_variables_network, build_game_features_network
+import numpy as np
+import torch
+from torch import nn
+from torch.autograd import Variable
+
+from src.utils import bool_flag
+from src.model.utils import value_loss, build_CNN_network
+from src.model.utils import build_game_variables_network, build_game_features_network
 
 
 logger = getLogger()
@@ -41,8 +42,8 @@ class DQNModuleBase(nn.Module):
             self.proj_state_values = nn.Linear(params.hidden_dim, 1)
 
         # log hidden layer sizes
-        logger.info('Conv layer output dim : %i' % self.conv_output_dim)
-        logger.info('Hidden layer input dim: %i' % self.output_dim)
+        logger.info('Conv layer output dim : %i', self.conv_output_dim)
+        logger.info('Hidden layer input dim: %i', self.output_dim)
 
     def base_forward(self, x_screens, x_variables):
         """
@@ -78,7 +79,7 @@ class DQNModuleBase(nn.Module):
 
         # create state input
         if self.n_variables:
-            if(len(embeddings[0].shape) != 3):
+            if len(embeddings[0].shape) != 3:
                 embeddings[0] = embeddings[0].unsqueeze(0)
                 embeddings[1] = embeddings[1].unsqueeze(0)
                 output = torch.cat([conv_output.unsqueeze(0)] + embeddings, dim=2)
@@ -105,6 +106,8 @@ class DQNModuleBase(nn.Module):
 
 class DQN(object):
 
+    DQNModuleClass = DQNModuleBase
+
     def __init__(self, params):
         # network parameters
         self.params = params
@@ -112,6 +115,7 @@ class DQN(object):
         self.hist_size = params.hist_size
         self.n_variables = params.n_variables
         self.n_features = params.n_features
+        self.pred_features = None
 
         # main module + loss functions
         self.module = self.DQNModuleClass(params)
@@ -122,6 +126,9 @@ class DQN(object):
         self.cuda = params.gpu_id >= 0
         if self.cuda:
             self.module.cuda()
+
+    def f_eval(self, last_states):
+        raise NotImplementedError
 
     def get_var(self, x):
         """Move a tensor to a CPU / GPU variable."""
@@ -135,10 +142,9 @@ class DQN(object):
         return dict(dqn_loss=[], gf_loss=[])
 
     def log_loss(self, loss_history):
-        logger.info('DQN loss: %.5f' % np.mean(loss_history['dqn_loss']))
+        logger.info('DQN loss: %.5f', np.mean(loss_history['dqn_loss']))
         if self.n_features > 0:
-            logger.info('Game features loss: %.5f' %
-                        np.mean(loss_history['gf_loss']))
+            logger.info('Game features loss: %.5f', np.mean(loss_history['gf_loss']))
 
     def prepare_f_eval_args(self, last_states):
         """
@@ -194,7 +200,7 @@ class DQN(object):
         loss_history['gf_loss'].append(loss_gf.data
                                        if self.n_features else 0)
 
-    def next_action(self, last_states, save_graph=False):
+    def next_action(self, last_states, _save_graph=False):
         scores, pred_features = self.f_eval(last_states)
         if self.params.network_type == 'dqn_ff':
             scores = scores.squeeze(0)

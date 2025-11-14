@@ -1,5 +1,6 @@
-import numpy as np
 from logging import getLogger
+
+import numpy as np
 
 
 # logger
@@ -27,7 +28,7 @@ class GameFeaturesConfusionMatrix(object):
         Store game features predictions results.
         We store results separatly for all maps.
         """
-        assert type(map_ids) is list and len(map_ids) > 0 and n_features > 0
+        assert isinstance(map_ids, list) and len(map_ids) > 0 and n_features > 0
         self.id_to_map = sorted(map_ids)
         self.map_to_id = {m: i for i, m in enumerate(self.id_to_map)}
         self.n_features = n_features
@@ -68,7 +69,7 @@ class GameFeaturesConfusionMatrix(object):
 
         # Print statistics for each map
         for j, m in enumerate(self.id_to_map):
-            logger.info('Map%02i' % m)
+            logger.info('Map%02i', m)
             for i in range(self.n_features):
                 pre = (self.pred_tp[j, i] * 1. /
                        max(self.pred_tp[j, i] + self.pred_fp[j, i], 1))
@@ -78,13 +79,16 @@ class GameFeaturesConfusionMatrix(object):
                 logger.info(
                     "%i ||| P: %6i ||| "
                     "TP: %6i - FP: %6i - FN: %6i - TN: %6i ||| "
-                    "Pre: %3.5f - Rec: %3.5f - F: %3.5f" %
-                    (
-                        i, self.pred_tp[j, i] + self.pred_fn[j, i],
-                        self.pred_tp[j, i], self.pred_fp[j, i],
-                        self.pred_fn[j, i], self.pred_tn[j, i],
-                        100. * pre, 100. * rec, 200. * f1
-                    )
+                    "Pre: %3.5f - Rec: %3.5f - F: %3.5f",
+                    i,
+                    self.pred_tp[j, i] + self.pred_fn[j, i],
+                    self.pred_tp[j, i],
+                    self.pred_fp[j, i],
+                    self.pred_fn[j, i],
+                    self.pred_tn[j, i],
+                    100. * pre,
+                    100. * rec,
+                    200. * f1
                 )
 
         # Print statistics for all maps
@@ -101,11 +105,14 @@ class GameFeaturesConfusionMatrix(object):
             logger.info(
                 "%i ||| P: %6i ||| "
                 "TP: %6i - FP: %6i - FN: %6i - TN: %6i ||| "
-                "Pre: %3.5f - Rec: %3.5f - F: %3.5f" %
-                (
-                    i, self.pred_tp[:, i].sum() + self.pred_fn[:, i].sum(),
-                    self.pred_tp[:, i].sum(), self.pred_fp[:, i].sum(),
-                    self.pred_fn[:, i].sum(), self.pred_tn[:, i].sum(),
-                    100. * pre, 100. * rec, 200. * f1
-                )
+                "Pre: %3.5f - Rec: %3.5f - F: %3.5f",
+                i,
+                self.pred_tp[:, i].sum() + self.pred_fn[:, i].sum(),
+                self.pred_tp[:, i].sum(),
+                self.pred_fp[:, i].sum(),
+                self.pred_fn[:, i].sum(),
+                self.pred_tn[:, i].sum(),
+                100. * pre,
+                100. * rec,
+                200. * f1
             )

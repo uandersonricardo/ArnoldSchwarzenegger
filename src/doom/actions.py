@@ -1,6 +1,8 @@
-import numpy as np
-from vizdoom import Button
 from logging import getLogger
+
+import numpy as np
+
+from vizdoom import Button
 
 
 # logger
@@ -12,8 +14,8 @@ class ActionBuilder(object):
     def __init__(self, params):
         self.params = params
         self.available_buttons = get_available_buttons(self.params)
-        logger.info('%i available buttons: %s' % (len(self.available_buttons),
-                                                  str(self.available_buttons)))
+        logger.info('%i available buttons: %s', len(self.available_buttons),
+                                                str(self.available_buttons))
 
         if params.use_continuous:
             assert params.speed == 'manual'
@@ -48,17 +50,18 @@ class ActionBuilder(object):
         # For DELTA actions we generate 1 value (a mean), as well as for
         # discrete ones where we generate a probability (Bernoulli).
         params.n_actions = self.n_actions
-        logger.info('%i available actions:\n%s' % (
+        logger.info(
+            '%i available actions:\n%s',
             self.n_actions,
             '\n'.join(str(a) for a in self.available_actions)
-        ))
+        )
 
     def get_action(self, action):
         """
         Convert selected action to the ViZDoom action format.
         """
         if self.params.use_continuous:
-            assert type(action) is list
+            assert isinstance(action, list)
             assert len(action) == len(self.available_actions)
             _doom_action = {}
             for x, y in zip(action, self.available_actions):
@@ -91,6 +94,12 @@ class ActionBuilder(object):
             a = action if type(action) == int else action.item()
             assert type(a) is int
             return self.doom_actions[a]
+
+    def get_number_of_actions(self):
+        """
+        Return the number of possible actions.
+        """
+        return self.n_actions
 
 
 action_categories_discrete = {
