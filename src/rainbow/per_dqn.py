@@ -9,7 +9,12 @@ from prioritized_replay_buffer import PrioritizedReplayBuffer
 from network import Network
 
 class PERDQNAgent(DQNAgent):
-    """DQN Agent interacting with environment.
+    """PER DQN Agent interacting with environment.
+
+    Inherits from DQNAgent and overrides __init__, update_model, _compute_dqn_loss, and train methods
+    to consider the priorization when sampling by applying Prioritized Experience Replay (PER). The PER
+    algorithm samples more important transitions more frequently and updates their priorities based on
+    the TD error.
     
     Attribute:
         game (Game): Doom game environment

@@ -8,7 +8,25 @@ from dqn import DQNAgent
 class DoubleDQNAgent(DQNAgent):
     """Double DQN Agent interacting with environment.
     
-    Inherits from DQNAgent and overrides methods to implement Double DQN.
+    Inherits from DQNAgent and overrides _compute_dqn_loss method to implement Double DQN.
+    The Double DQN algorithm decouples action selection and action evaluation to reduce
+    overestimation bias in Q-learning.
+
+    Attribute:
+        game (Game): Doom game environment
+        memory (ReplayBuffer): replay memory to store transitions
+        batch_size (int): batch size for sampling
+        epsilon (float): parameter for epsilon greedy policy
+        epsilon_decay (float): step size to decrease epsilon
+        max_epsilon (float): max value of epsilon
+        min_epsilon (float): min value of epsilon
+        target_update (int): period for target model's hard update
+        gamma (float): discount factor
+        dqn (Network): model to train and select actions
+        dqn_target (Network): target model to update
+        optimizer (torch.optim): optimizer for training dqn
+        transition (list): transition information including 
+                           state, action, reward, next_state, done
     """
 
     def __init__(
