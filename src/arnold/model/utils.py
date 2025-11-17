@@ -4,7 +4,7 @@ import torch
 from torch import nn
 from torch.autograd import Variable
 
-from src.model.bucketed_embedding import BucketedEmbedding
+from src.arnold.model.bucketed_embedding import BucketedEmbedding
 
 
 logger = getLogger()

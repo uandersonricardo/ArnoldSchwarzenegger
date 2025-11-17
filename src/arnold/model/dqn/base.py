@@ -5,9 +5,9 @@ import torch
 from torch import nn
 from torch.autograd import Variable
 
-from src.utils import bool_flag
-from src.model.utils import value_loss, build_CNN_network
-from src.model.utils import build_game_variables_network, build_game_features_network
+from src.arnold.utils import bool_flag
+from src.arnold.model.utils import value_loss, build_CNN_network
+from src.arnold.model.utils import build_game_variables_network, build_game_features_network
 
 
 logger = getLogger()

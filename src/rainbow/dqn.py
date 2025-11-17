@@ -1,248 +1,91 @@
-import numpy as np
-import matplotlib.pyplot as plt
+import copy
+
 import torch
-import torch.nn.functional as F
-import torch.optim as optim
+import numpy as np
 
-from src.doom.game import Game
-from src.rainbow.replay_buffer import ReplayBuffer
-from src.rainbow.network import Network
+from src.rainbow.network import Dueling_Net, Net
 
-class DQNAgent:
-    """DQN Agent interacting with environment.
-    
-    Attribute:
-        game (Game): Doom game environment
-        memory (ReplayBuffer): replay memory to store transitions
-        batch_size (int): batch size for sampling
-        epsilon (float): parameter for epsilon greedy policy
-        epsilon_decay (float): step size to decrease epsilon
-        max_epsilon (float): max value of epsilon
-        min_epsilon (float): min value of epsilon
-        target_update (int): period for target model's hard update
-        gamma (float): discount factor
-        dqn (Network): model to train and select actions
-        dqn_target (Network): target model to update
-        optimizer (torch.optim): optimizer for training dqn
-        transition (list): transition information including 
-                           state, action, reward, next_state, done
-    """
 
-    def __init__(
-        self,
-        game: Game,
-        memory_size: int,
-        batch_size: int,
-        target_update: int,
-        epsilon_decay: float,
-        seed: int,
-        max_epsilon: float = 1.0,
-        min_epsilon: float = 0.1,
-        gamma: float = 0.99,
-    ):
-        """Initialization.
-        
-        Args:
-            game (Game): Doom game environment
-            memory_size (int): length of memory
-            batch_size (int): batch size for sampling
-            target_update (int): period for target model's hard update
-            epsilon_decay (float): step size to decrease epsilon
-            lr (float): learning rate
-            max_epsilon (float): max value of epsilon
-            min_epsilon (float): min value of epsilon
-            gamma (float): discount factor
-        """
-        state_dim = game.get_screen_resolution()
-        action_dim = game.get_number_of_actions()
+class DQN(object):
+    def __init__(self, args):
+        self.action_dim = args.action_dim
+        self.batch_size = args.batch_size  # batch size
+        self.max_train_steps = args.max_train_steps
+        self.lr = args.lr  # learning rate
+        self.gamma = args.gamma  # discount factor
+        self.tau = args.tau  # Soft update
+        self.use_soft_update = args.use_soft_update
+        self.target_update_freq = args.target_update_freq  # hard update
+        self.update_count = 0
 
-        self.game = game
-        self.memory = ReplayBuffer(state_dim, memory_size, batch_size)
-        self.batch_size = batch_size
-        self.epsilon = max_epsilon
-        self.epsilon_decay = epsilon_decay
-        self.seed = seed
-        self.max_epsilon = max_epsilon
-        self.min_epsilon = min_epsilon
-        self.target_update = target_update
-        self.gamma = gamma
+        self.grad_clip = args.grad_clip
+        self.use_lr_decay = args.use_lr_decay
+        self.use_double = args.use_double
+        self.use_dueling = args.use_dueling
+        self.use_per = args.use_per
+        self.use_n_steps = args.use_n_steps
+        if self.use_n_steps:
+            self.gamma = self.gamma ** args.n_steps
 
-        # device: cpu / gpu
-        self.device = torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu"
-        )
-        print(self.device)
-
-        # networks: dqn, dqn_target
-        self.dqn = Network(state_dim, action_dim).to(self.device)
-        self.dqn_target = Network(state_dim, action_dim).to(self.device)
-        self.dqn_target.load_state_dict(self.dqn.state_dict())
-        self.dqn_target.eval()
-
-        # optimizer
-        self.optimizer = optim.Adam(self.dqn.parameters())
-
-        # transition to store in memory
-        self.transition = list()
-
-        # mode: train / test
-        self.is_test = False
-
-    def select_action(self, state: np.ndarray) -> np.ndarray:
-        """Select an action from the input state."""
-        # epsilon greedy policy
-        if self.epsilon > np.random.random():
-            selected_action = self.game.action_builder.sample()
+        if self.use_dueling:  # Whether to use the 'dueling network'
+            self.net = Dueling_Net(args)
         else:
-            selected_action = self.dqn(
-                torch.FloatTensor(state).to(self.device)
-            ).argmax()
-            selected_action = selected_action.detach().cpu().numpy()
+            self.net = Net(args)
 
-        if not self.is_test:
-            self.transition = [state, selected_action]
+        self.target_net = copy.deepcopy(self.net)  # Copy the online_net to the target_net
 
-        return selected_action
+        self.optimizer = torch.optim.Adam(self.net.parameters(), lr=self.lr)
 
-    def step(self, action: np.ndarray) -> tuple[np.ndarray, np.float64, bool]:
-        """Take an action and return the response of the game."""
-        next_state, reward, terminated, truncated, _ = self.game.step(action)
-        done = terminated or truncated
+    def choose_action(self, state, epsilon):
+        with torch.no_grad():
+            print("--- STATE SHAPE", state)
+            state = torch.unsqueeze(torch.tensor(state, dtype=torch.float), 0)
+            q = self.net(state)
+            if np.random.uniform() > epsilon:
+                action = q.argmax(dim=-1).item()
+            else:
+                action = np.random.randint(0, self.action_dim)
+            return action
 
-        if not self.is_test:
-            self.transition += [reward, next_state, done]
-            self.memory.store(*self.transition)
+    def learn(self, replay_buffer, total_steps):
+        batch, batch_index, IS_weight = replay_buffer.sample(total_steps)
 
-        return next_state, reward, done
+        with torch.no_grad():  # q_target has no gradient
+            if self.use_double:  # Whether to use the 'double q-learning'
+                # Use online_net to select the action
+                a_argmax = self.net(batch['next_state']).argmax(dim=-1, keepdim=True)  # shape：(batch_size,1)
+                # Use target_net to estimate the q_target
+                q_target = batch['reward'] + self.gamma * (1 - batch['terminal']) * self.target_net(batch['next_state']).gather(-1, a_argmax).squeeze(-1)  # shape：(batch_size,)
+            else:
+                q_target = batch['reward'] + self.gamma * (1 - batch['terminal']) * self.target_net(batch['next_state']).max(dim=-1)[0]  # shape：(batch_size,)
 
-    def update_model(self) -> torch.Tensor:
-        """Update the model by gradient descent."""
-        samples = self.memory.sample()
+        q_current = self.net(batch['state']).gather(-1, batch['action']).squeeze(-1)  # shape：(batch_size,)
+        td_errors = q_current - q_target  # shape：(batch_size,)
 
-        loss = self._compute_dqn_loss(samples)
+        if self.use_per:
+            loss = (IS_weight * (td_errors ** 2)).mean()
+            replay_buffer.update_batch_priorities(batch_index, td_errors.detach().numpy())
+        else:
+            loss = (td_errors ** 2).mean()
 
         self.optimizer.zero_grad()
         loss.backward()
+        if self.grad_clip:
+            torch.nn.utils.clip_grad_norm_(self.net.parameters(), self.grad_clip)
         self.optimizer.step()
 
-        return loss.item()
+        if self.use_soft_update:  # soft update
+            for param, target_param in zip(self.net.parameters(), self.target_net.parameters()):
+                target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+        else:  # hard update
+            self.update_count += 1
+            if self.update_count % self.target_update_freq == 0:
+                self.target_net.load_state_dict(self.net.state_dict())
 
-    def train(self, num_frames: int, plotting_interval: int = 200):
-        """Train the agent."""
-        self.is_test = False
+        if self.use_lr_decay:  # learning rate Decay
+            self.lr_decay(total_steps)
 
-        state, _ = self.game.reset(seed=self.seed)
-        update_cnt = 0
-        epsilons = []
-        losses = []
-        scores = []
-        score = 0
-
-        for frame_idx in range(1, num_frames + 1):
-            action = self.select_action(state)
-            next_state, reward, done = self.step(action)
-
-            state = next_state
-            score += reward
-
-            # if episode ends
-            if done:
-                state, _ = self.game.reset(seed=self.seed)
-                scores.append(score)
-                score = 0
-
-            # if training is ready
-            if len(self.memory) >= self.batch_size:
-                loss = self.update_model()
-                losses.append(loss)
-                update_cnt += 1
-
-                # linearly decrease epsilon
-                self.epsilon = max(
-                    self.min_epsilon, self.epsilon - (
-                        self.max_epsilon - self.min_epsilon
-                    ) * self.epsilon_decay
-                )
-                epsilons.append(self.epsilon)
-
-                # if hard update is needed
-                if update_cnt % self.target_update == 0:
-                    self._target_hard_update()
-
-            # plotting
-            if frame_idx % plotting_interval == 0:
-                self._plot(frame_idx, scores, losses, epsilons)
-
-        self.game.close()
-
-    def test(self) -> None:
-        """Test the agent."""
-        self.is_test = True
-
-        # for recording a video
-        naive_game = self.game
-        # self.game = gym.wrappers.RecordVideo(self.game, video_folder=video_folder)
-
-        state, _ = self.game.reset(seed=self.seed)
-        done = False
-        score = 0
-
-        while not done:
-            action = self.select_action(state)
-            next_state, reward, done = self.step(action)
-
-            state = next_state
-            score += reward
-
-        print("score: ", score)
-        self.game.close()
-
-        # reset
-        self.game = naive_game
-
-    def _compute_dqn_loss(self, samples: dict[str, np.ndarray]) -> torch.Tensor:
-        """Return dqn loss."""
-        device = self.device  # for shortening the following lines
-        state = torch.FloatTensor(samples["state"]).to(device)
-        next_state = torch.FloatTensor(samples["next_state"]).to(device)
-        action = torch.LongTensor(samples["action"].reshape(-1, 1)).to(device)
-        reward = torch.FloatTensor(samples["reward"].reshape(-1, 1)).to(device)
-        done = torch.FloatTensor(samples["done"].reshape(-1, 1)).to(device)
-
-        # G_t   = r + gamma * v(s_{t+1})  if state != Terminal
-        #       = r                       otherwise
-        curr_q_value = self.dqn(state).gather(1, action)
-        next_q_value = self.dqn_target(
-            next_state
-        ).max(dim=1, keepdim=True)[0].detach()
-        mask = 1 - done
-        target = (reward + self.gamma * next_q_value * mask).to(self.device)
-
-        # calculate dqn loss
-        loss = F.smooth_l1_loss(curr_q_value, target)
-
-        return loss
-
-    def _target_hard_update(self):
-        """Hard update: target <- local."""
-        self.dqn_target.load_state_dict(self.dqn.state_dict())
-
-    def _plot(
-        self,
-        frame_idx: int,
-        scores: list[float],
-        losses: list[float],
-        epsilons: list[float],
-    ):
-        """Plot the training progresses."""
-        plt.figure(figsize=(20, 5))
-        plt.subplot(131)
-        plt.title('frame %s. score: %s' % (frame_idx, np.mean(scores[-10:])))
-        plt.plot(scores)
-        plt.subplot(132)
-        plt.title('loss')
-        plt.plot(losses)
-        plt.subplot(133)
-        plt.title('epsilons')
-        plt.plot(epsilons)
-        plt.show()
+    def lr_decay(self, total_steps):
+        lr_now = 0.9 * self.lr * (1 - total_steps / self.max_train_steps) + 0.1 * self.lr
+        for p in self.optimizer.param_groups:
+            p['lr'] = lr_now

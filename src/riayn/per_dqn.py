@@ -1,12 +1,12 @@
-from dqn import DQNAgent
-
+import numpy as np
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
 
-from src.doom.game import Game
-from prioritized_replay_buffer import PrioritizedReplayBuffer
-from network import Network
+from src.arnold.doom.game import Game
+from src.riayn.dqn import DQNAgent
+from src.riayn.prioritized_replay_buffer import PrioritizedReplayBuffer
+from src.riayn.network import Network
 
 class PERDQNAgent(DQNAgent):
     """PER DQN Agent interacting with environment.
@@ -35,9 +35,8 @@ class PERDQNAgent(DQNAgent):
         beta (float): determines how much importance sampling is used
         prior_eps (float): guarantees every transition can be sampled
     """
-
     def __init__(
-        self, 
+        self,
         game: Game,
         memory_size: int,
         batch_size: int,
@@ -72,7 +71,7 @@ class PERDQNAgent(DQNAgent):
         action_dim = game.get_number_of_actions()
 
         self.game = game
-        
+
         self.batch_size = batch_size
         self.epsilon = max_epsilon
         self.epsilon_decay = epsilon_decay
@@ -81,13 +80,13 @@ class PERDQNAgent(DQNAgent):
         self.min_epsilon = min_epsilon
         self.target_update = target_update
         self.gamma = gamma
-        
+
         # device: cpu / gpu
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu"
         )
         print(self.device)
-        
+
         # PER
         # In DQN, We used "ReplayBuffer(obs_dim, memory_size, batch_size)"
         self.beta = beta
@@ -101,13 +100,13 @@ class PERDQNAgent(DQNAgent):
         self.dqn_target = Network(state_dim, action_dim).to(self.device)
         self.dqn_target.load_state_dict(self.dqn.state_dict())
         self.dqn_target.eval()
-        
+
         # optimizer
         self.optimizer = optim.Adam(self.dqn.parameters())
 
         # transition to store in memory
         self.transition = list()
-        
+
         # mode: train / test
         self.is_test = False
 
@@ -133,7 +132,7 @@ class PERDQNAgent(DQNAgent):
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
-        
+
         # PER: update priorities
         loss_for_prior = elementwise_loss.detach().cpu().numpy()
         new_priorities = loss_for_prior + self.prior_eps
@@ -141,7 +140,7 @@ class PERDQNAgent(DQNAgent):
 
         return loss.item()
 
-    def _compute_dqn_loss(self, samples: Dict[str, np.ndarray]) -> torch.Tensor:
+    def _compute_dqn_loss(self, samples: dict[str, np.ndarray]) -> torch.Tensor:
         """Return dqn loss."""
         device = self.device  # for shortening the following lines
         state = torch.FloatTensor(samples["obs"]).to(device)
@@ -167,7 +166,7 @@ class PERDQNAgent(DQNAgent):
     def train(self, num_frames: int, plotting_interval: int = 200):
         """Train the agent."""
         self.is_test = False
-        
+
         state, _ = self.env.reset(seed=self.seed)
         update_cnt = 0
         epsilons = []
@@ -181,7 +180,7 @@ class PERDQNAgent(DQNAgent):
 
             state = next_state
             score += reward
-            
+
             # PER: increase beta
             fraction = min(frame_idx / num_frames, 1.0)
             self.beta = self.beta + fraction * (1.0 - self.beta)
@@ -197,7 +196,7 @@ class PERDQNAgent(DQNAgent):
                 loss = self.update_model()
                 losses.append(loss)
                 update_cnt += 1
-                
+
                 # linearly decrease epsilon
                 self.epsilon = max(
                     self.min_epsilon, self.epsilon - (
@@ -205,7 +204,7 @@ class PERDQNAgent(DQNAgent):
                     ) * self.epsilon_decay
                 )
                 epsilons.append(self.epsilon)
-                
+
                 # if hard update is needed
                 if update_cnt % self.target_update == 0:
                     self._target_hard_update()
@@ -213,5 +212,5 @@ class PERDQNAgent(DQNAgent):
             # plotting
             if frame_idx % plotting_interval == 0:
                 self._plot(frame_idx, scores, losses, epsilons)
-                
+
         self.env.close()

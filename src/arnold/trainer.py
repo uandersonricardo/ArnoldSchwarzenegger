@@ -4,8 +4,8 @@ from logging import getLogger
 import torch
 import numpy as np
 
-from src.utils import get_optimizer
-from src.replay_memory import ReplayMemory
+from src.arnold.utils import get_optimizer
+from src.arnold.replay_memory import ReplayMemory
 
 
 logger = getLogger()

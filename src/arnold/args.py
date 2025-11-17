@@ -2,9 +2,9 @@ import os
 import argparse
 import importlib
 
-from src.utils import bool_flag, map_ids_flag, bcast_json_list
-from src.doom.utils import get_n_feature_maps
-from src.doom.game_features import parse_game_features
+from src.arnold.utils import bool_flag, map_ids_flag, bcast_json_list
+from src.arnold.doom.utils import get_n_feature_maps
+from src.arnold.doom.game_features import parse_game_features
 
 
 def parse_game_args(args):

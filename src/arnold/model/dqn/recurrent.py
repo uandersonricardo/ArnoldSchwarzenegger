@@ -1,9 +1,9 @@
 import torch
 from torch.autograd import Variable
 
-from src.utils import bool_flag
-from src.model.utils import get_recurrent_module
-from src.model.dqn.base import DQNModuleBase, DQN
+from src.arnold.utils import bool_flag
+from src.arnold.model.utils import get_recurrent_module
+from src.arnold.model.dqn.base import DQNModuleBase, DQN
 
 
 class DQNModuleRecurrent(DQNModuleBase):

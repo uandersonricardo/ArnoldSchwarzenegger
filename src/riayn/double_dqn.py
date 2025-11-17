@@ -1,9 +1,9 @@
 import numpy as np
 import torch
 import torch.nn.functional as F
-from src.doom.game import Game
 
-from dqn import DQNAgent
+from src.arnold.doom.game import Game
+from src.riayn.dqn import DQNAgent
 
 class DoubleDQNAgent(DQNAgent):
     """Double DQN Agent interacting with environment.
@@ -80,7 +80,7 @@ class DoubleDQNAgent(DQNAgent):
         action = torch.LongTensor(samples["acts"].reshape(-1, 1)).to(device)
         reward = torch.FloatTensor(samples["rews"].reshape(-1, 1)).to(device)
         done = torch.FloatTensor(samples["done"].reshape(-1, 1)).to(device)
-        
+
         # G_t   = r + gamma * v(s_{t+1})  if state != Terminal
         #       = r                       otherwise
         curr_q_value = self.dqn(state).gather(1, action)

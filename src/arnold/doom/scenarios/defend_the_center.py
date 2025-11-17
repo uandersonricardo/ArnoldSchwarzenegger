@@ -6,33 +6,26 @@ from logging import getLogger
 import numpy as np
 import torch
 
-from src.utils import set_num_threads, get_device_mapping, bool_flag
-from src.model import register_model_args, get_model_class
-from src.trainer import ReplayMemoryTrainer
-from src.args import finalize_args
-from src.doom.game_features import GameFeaturesConfusionMatrix
-from src.doom.game import Game
-from src.doom.actions import ActionBuilder
+from src.arnold.utils import set_num_threads, get_device_mapping
+from src.arnold.model import register_model_args, get_model_class
+from src.arnold.trainer import ReplayMemoryTrainer
+from src.arnold.args import finalize_args
+from src.arnold.doom.game_features import GameFeaturesConfusionMatrix
+from src.arnold.doom.game import Game
+from src.arnold.doom.actions import ActionBuilder
 
 
 logger = getLogger()
 
 
-def register_scenario_args(parser):
-    # supreme mode for health gathering
-    parser.add_argument("--supreme", type=bool_flag, default=False,
-                        help="Use the supreme mode for health gathering")
-
-
 def main(parser, args, parameter_server=None):
 
-    # register model and scenario parameters / parse parameters
+    # register model parameters / parse parameters
     register_model_args(parser, args)
-    register_scenario_args(parser)
     params = parser.parse_args(args)
 
     # Game variables / Game features / feature maps
-    params.game_variables = [('health', 101)]
+    params.game_variables = [('health', 101), ('sel_ammo', 301)]
     finalize_args(params)
 
     # Training / Evaluation settings
@@ -52,17 +45,14 @@ def main(parser, args, parameter_server=None):
         torch.cuda.set_device(params.gpu_id)
 
     # Action builder
-    assert 'attack' not in params.action_combinations
+    assert params.action_combinations in ['turn_lr+attack', 'attack+turn_lr',
+                                          'turn_lr;attack', 'attack;turn_lr']
     action_builder = ActionBuilder(params)
-
-    # Give a reward for survival
-    reward_values = {'BASE_REWARD': 0.01, 'MEDIKIT': 1, 'INJURED': 0}
 
     # Initialize the game
     game = Game(
-        scenario='health_gathering%s' % ('_supreme' if params.supreme else ''),
+        scenario='defend_the_center',
         action_builder=action_builder,
-        reward_values=reward_values,
         score_variable='USER1',
         freedoom=params.freedoom,
         use_screen_buffer=params.use_screen_buffer,
@@ -73,10 +63,9 @@ def main(parser, args, parameter_server=None):
         player_rank=params.player_rank,
         players_per_game=params.players_per_game,
         render_hud=params.render_hud,
-        render_crosshair=False,
-        render_weapon=False,
+        render_crosshair=params.render_crosshair,
+        render_weapon=params.render_weapon,
         freelook=params.freelook,
-        respawn_protect=False,
         visible=params.visualize
     )
 
@@ -97,18 +86,18 @@ def main(parser, args, parameter_server=None):
 
     # Visualize only
     if params.evaluate:
-        evaluate_health_gathering(game, network, params)
+        evaluate_defend_the_center(game, network, params)
     else:
         logger.info('Starting experiment...')
         if params.network_type.startswith('dqn'):
             trainer_class = ReplayMemoryTrainer
         else:
             raise RuntimeError("unknown network type " + params.network_type)
-        trainer_class(params, game, network, evaluate_health_gathering,
+        trainer_class(params, game, network, evaluate_defend_the_center,
                       parameter_server=parameter_server).run()
 
 
-def evaluate_health_gathering(game, network, params, n_train_iter=None):
+def evaluate_defend_the_center(game, network, params, n_train_iter=None):
     """
     Evaluate the model.
     """
@@ -125,17 +114,17 @@ def evaluate_health_gathering(game, network, params, n_train_iter=None):
     last_states = []
     if n_features > 0:
         gf_confusion = GameFeaturesConfusionMatrix([map_id], n_features)
-    survival_time = []
+    n_kills = []
 
     while True:
         n_iter += 1
 
         if game.is_player_dead() or game.is_episode_finished():
             # store the number of kills
-            survival_time.append(game.game.get_episode_time())
-            logger.info("Survived for %i steps.", game.game.get_episode_time())
+            n_kills.append(game.properties['score'])
+            logger.info("%i kills.", game.properties['score'])
             logger.info("===============")
-            if len(survival_time) == params.eval_episodes:
+            if len(n_kills) == params.eval_episodes:
                 break
             game.new_episode()
             network.reset()
@@ -161,17 +150,17 @@ def evaluate_health_gathering(game, network, params, n_train_iter=None):
     game.close()
 
     # log the number of iterations and statistics
-    logger.info("%i iterations on %i episodes.", n_iter, len(survival_time))
+    logger.info("%i iterations on %i episodes.", n_iter, len(n_kills))
     if n_features != 0:
         gf_confusion.print_statistics()
-    logger.info("Survival time by episode: %s", str(survival_time))
-    logger.info("%f survival time / episode average.", np.mean(survival_time))
-    to_log = {'min_survival_time': float(np.min(survival_time)),
-              'max_survival_time': float(np.max(survival_time)),
-              'mean_survival_time': float(np.mean(survival_time))}
+    logger.info("Kills by episode: %s", str(n_kills))
+    logger.info("%f kills / episode average.", np.mean(n_kills))
+    to_log = {'min_n_kills': float(np.min(n_kills)),
+              'max_n_kills': float(np.max(n_kills)),
+              'mean_n_kills': float(np.mean(n_kills))}
     if n_train_iter is not None:
         to_log['n_iter'] = n_train_iter
     logger.info("__log__:%s", json.dumps(to_log))
 
     # evaluation score
-    return np.mean(survival_time)
+    return np.mean(n_kills)

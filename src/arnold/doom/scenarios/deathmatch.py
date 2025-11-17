@@ -5,12 +5,13 @@ from logging import getLogger
 
 import torch
 
-from src.utils import set_num_threads, get_device_mapping, bool_flag
-from src.model import register_model_args, get_model_class
-from src.args import finalize_args
-from src.doom.game_features import GameFeaturesConfusionMatrix
-from src.doom.game import Game
-from src.doom.actions import ActionBuilder
+from src.arnold.utils import set_num_threads, get_device_mapping, bool_flag
+from src.arnold.model import register_model_args, get_model_class
+from src.arnold.trainer import ReplayMemoryTrainer
+from src.arnold.args import finalize_args
+from src.arnold.doom.game_features import GameFeaturesConfusionMatrix
+from src.arnold.doom.game import Game
+from src.arnold.doom.actions import ActionBuilder
 
 
 logger = getLogger()
@@ -30,12 +31,6 @@ def register_scenario_args(parser):
                         help="Randomize textures during training")
     parser.add_argument("--init_bots_health", type=int, default=100,
                         help="Initial bots health during training")
-    parser.add_argument("--eval_model_path", type=str, default="",
-                        help="Models locations")
-    parser.add_argument("--eval_model_ids", type=str, default="",
-                        help="Models name")
-    parser.add_argument("--eval_time", type=int, default=100,
-                        help="Evaluation time (in seconds)")
 
 
 def parse_reward_values(reward_values):
@@ -61,15 +56,16 @@ def main(parser, args, parameter_server=None):
     register_model_args(parser, args)
     register_scenario_args(parser)
     params = parser.parse_args(args)
+    params.human_player = params.human_player and params.player_rank == 0
 
     # Game variables / Game features / feature maps
     params.game_variables = [('health', 101), ('sel_ammo', 301)]
     finalize_args(params)
 
     # Training / Evaluation parameters
-    params.episode_time = None   # episode maximum duration (in seconds)
-    params.eval_freq = 20000     # time (in iterations) between 2 evaluations
-    params.eval_time = 7200      # evaluation time (in seconds)
+    params.episode_time = None  # episode maximum duration (in seconds)
+    params.eval_freq = 20000    # time (in iterations) between 2 evaluations
+    params.eval_time = 900      # evaluation time (in seconds)
 
     # log experiment parameters
     with open(os.path.join(params.dump_path, 'params.pkl'), 'wb') as f:
@@ -90,14 +86,14 @@ def main(parser, args, parameter_server=None):
         scenario=params.wad,
         action_builder=action_builder,
         reward_values=parse_reward_values(params.reward_values),
-        score_variable='FRAGCOUNT',
+        score_variable='USER2',
         freedoom=params.freedoom,
-        # screen_resolution='RES_400X225',
+        screen_resolution='RES_400X225',
         use_screen_buffer=params.use_screen_buffer,
         use_depth_buffer=params.use_depth_buffer,
         labels_mapping=params.labels_mapping,
         game_features=params.game_features,
-        mode='PLAYER',
+        mode=('SPECTATOR' if params.human_player else 'PLAYER'),
         player_rank=params.player_rank,
         players_per_game=params.players_per_game,
         render_hud=params.render_hud,
@@ -106,33 +102,35 @@ def main(parser, args, parameter_server=None):
         freelook=params.freelook,
         visible=params.visualize,
         n_bots=params.n_bots,
-        use_scripted_marines=False
+        use_scripted_marines=True
     )
-
-    assert parameter_server is None and params.evaluate
-    assert params.eval_model_path
 
     # Network initialization and optional reloading
     network = get_model_class(params.network_type)(params)
-
-    def reload_model(path):
-        assert os.path.isfile(path)
-        logger.info('Reloading model from %s...', path)
-        model_path = os.path.join(params.dump_path, path)
+    if params.reload:
+        logger.info('Reloading model from %s...', params.reload)
+        model_path = os.path.join(params.dump_path, params.reload)
         map_location = get_device_mapping(params.gpu_id)
         reloaded = torch.load(model_path, map_location=map_location)
         network.module.load_state_dict(reloaded)
+    assert params.n_features == network.module.n_features
 
-    model_ids = [x for x in params.eval_model_ids.split(',') if len(x) > 0]
-    scores = {}
-    for model_id in model_ids:
-        logger.info("====================== Evaluating %s ======================", model_id)
-        model_path = os.path.join(params.eval_model_path, model_id)
-        logger.info(model_path)
-        reload_model(model_path)
-        stats = evaluate_deathmatch(game, network, params)
-        scores[model_id] = stats
-    logger.info(scores)
+    # Parameter server (multi-agent training, self-play, etc.)
+    if parameter_server:
+        assert params.gpu_id == -1
+        parameter_server.register_model(network.module)
+
+    # Visualize only
+    if params.evaluate:
+        evaluate_deathmatch(game, network, params)
+    else:
+        logger.info('Starting experiment...')
+        if params.network_type.startswith('dqn'):
+            trainer_class = ReplayMemoryTrainer
+        else:
+            raise RuntimeError("unknown network type " + params.network_type)
+        trainer_class(params, game, network, evaluate_deathmatch,
+                      parameter_server=parameter_server).run()
 
 
 def evaluate_deathmatch(game, network, params, n_train_iter=None):
@@ -152,7 +150,8 @@ def evaluate_deathmatch(game, network, params, n_train_iter=None):
     for map_id in params.map_ids_test:
 
         logger.info("Evaluating on map %i ...", map_id)
-        game.start(map_id=map_id, log_events=False)
+        game.start(map_id=map_id, log_events=True,
+                   manual_control=(params.manual_control and not params.human_player))
         game.randomize_textures(False)
         game.init_bots_health(100)
         network.reset()
@@ -175,7 +174,7 @@ def evaluate_deathmatch(game, network, params, n_train_iter=None):
 
             # observe the game state / select the next action
             game.observe_state(params, last_states)
-            action = network.next_action(last_states)
+            action = network.next_action(last_states).tolist()
             pred_features = network.pred_features
 
             # game features
@@ -189,16 +188,15 @@ def evaluate_deathmatch(game, network, params, n_train_iter=None):
 
             sleep = 0.01 if params.evaluate else None
             game.make_action(action, params.frame_skip, sleep=sleep)
-            # print(game.game.get_episode_time())
 
         # close the game
         game.close()
-        logger.info("%i iterations", n_iter)
 
-    # log the statistics
+    # log the number of iterations and statistics
+    logger.info("%i iterations", n_iter)
     if n_features != 0:
         confusion.print_statistics()
-    game.print_statistics(params.eval_time)
+    game.print_statistics()
     to_log = ['kills', 'deaths', 'suicides', 'frags', 'k/d']
     to_log = {k: game.statistics['all'][k] for k in to_log}
     if n_train_iter is not None:
@@ -206,4 +204,4 @@ def evaluate_deathmatch(game, network, params, n_train_iter=None):
     logger.info("__log__:%s", json.dumps(to_log))
 
     # evaluation score
-    return game.statistics['all']
+    return game.statistics['all']['frags']

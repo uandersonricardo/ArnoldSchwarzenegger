@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from torch.autograd import Variable
 
-from src.model.dqn.base import DQNModuleBase, DQN
+from src.arnold.model.dqn.base import DQNModuleBase, DQN
 
 
 class DQNModuleFeedforward(DQNModuleBase):

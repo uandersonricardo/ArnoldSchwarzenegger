@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-from src.doom.labels import get_label_type_id, parse_labels_mapping
+from src.arnold.doom.labels import get_label_type_id, parse_labels_mapping
 
 
 def process_buffers(game, params):

@@ -1,12 +1,58 @@
 import argparse
 
+import cv2
 import torch
 import numpy as np
 import gymnasium as gym
-from torch.utils.tensorboard import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter
+from vizdoom import gymnasium_wrapper
 
 from src.rainbow.replay_buffer import *
-from src.rainbow.rainbow_dqn import DQN
+from src.rainbow.dqn import DQN
+
+# Constants
+DEFAULT_ENV = "VizdoomDeathmatch-v0"
+AVAILABLE_ENVS = [env for env in gym.envs.registry.keys() if "Vizdoom" in env]  # type: ignore
+
+# Height and width of the resized image
+IMAGE_SHAPE = (60, 80)
+
+# Training parameters
+TRAINING_TIMESTEPS = int(1e6)
+N_STEPS = 128
+N_ENVS = 8
+FRAME_SKIP = 4
+
+class ObservationWrapper(gym.ObservationWrapper):
+    """
+    ViZDoom environments return dictionaries as observations, containing
+    the main image as well other info.
+    The image is also too large for normal training.
+
+    This wrapper replaces the dictionary observation space with a simple
+    Box space (i.e., only the RGB image), and also resizes the image to a
+    smaller size.
+
+    NOTE: Ideally, you should set the image size to smaller in the scenario files
+          for faster running of ViZDoom. This can really impact performance,
+          and this code is pretty slow because of this!
+    """
+
+    def __init__(self, env, shape=IMAGE_SHAPE):
+        super().__init__(env)
+        self.image_shape = shape
+        self.image_shape_reverse = shape[::-1]
+
+        # Create new observation space with the new shape
+        num_channels = env.observation_space["screen"].shape[-1]
+        new_shape = (shape[0], shape[1], num_channels)
+
+        self.observation_space = gym.spaces.Box(
+            0, 255, shape=new_shape, dtype=np.uint8
+        )
+
+    def observation(self, observation):
+        return cv2.resize(observation["screen"], self.image_shape_reverse)
 
 
 class Runner:
@@ -16,22 +62,22 @@ class Runner:
         self.number = number
         self.seed = seed
 
-        self.env = gym.make(env_name)
-        self.env_evaluate = gym.make(env_name)  # When evaluating the policy, we need to rebuild an environment
-        self.env.seed(seed)
+        self.env = self.wrap_env(gym.make(env_name, render_mode="human", frame_skip=FRAME_SKIP))
+        self.env_evaluate = self.wrap_env(gym.make(env_name, render_mode="human", frame_skip=FRAME_SKIP))  # When evaluating the policy, we need to rebuild an environment
+        # self.env.seed(seed)
         self.env.action_space.seed(seed)
-        self.env_evaluate.seed(seed)
+        # self.env_evaluate.seed(seed)
         self.env_evaluate.action_space.seed(seed)
         np.random.seed(seed)
         torch.manual_seed(seed)
 
-        self.args.state_dim = self.env.observation_space.shape[0]
-        self.args.action_dim = self.env.action_space.n
-        self.args.episode_limit = self.env._max_episode_steps  # Maximum number of steps per episode
+        self.args.state_dim = self.env.observation_space.shape
+        self.args.action_dim = self.env.action_space["binary"].n
+        # self.args.episode_limit = self.env._max_episode_steps  # Maximum number of steps per episode
         print("env={}".format(self.env_name))
         print("state_dim={}".format(self.args.state_dim))
         print("action_dim={}".format(self.args.action_dim))
-        print("episode_limit={}".format(self.args.episode_limit))
+        # print("episode_limit={}".format(self.args.episode_limit))
 
         if args.use_per and args.use_n_steps:
             self.replay_buffer = N_Steps_Prioritized_ReplayBuffer(args)
@@ -58,7 +104,7 @@ class Runner:
             if args.use_n_steps:
                 self.algorithm += "_N_steps"
 
-        self.writer = SummaryWriter(log_dir='runs/DQN/{}_env_{}_number_{}_seed_{}'.format(self.algorithm, env_name, number, seed))
+        # self.writer = SummaryWriter(log_dir='runs/DQN/{}_env_{}_number_{}_seed_{}'.format(self.algorithm, env_name, number, seed))
 
         self.evaluate_num = 0  # Record the number of evaluations
         self.evaluate_rewards = []  # Record the rewards during the evaluating
@@ -73,12 +119,13 @@ class Runner:
     def run(self, ):
         self.evaluate_policy()
         while self.total_steps < self.args.max_train_steps:
-            state = self.env.reset()
+            state, _ = self.env.reset()
             done = False
             episode_steps = 0
             while not done:
                 action = self.agent.choose_action(state, epsilon=self.epsilon)
-                next_state, reward, done, _ = self.env.step(action)
+                next_state, reward, terminated, truncated, _ = self.env.step({"binary": action, "continuous": [0.0, 0.0, 0.0] })
+                done = terminated or truncated
                 episode_steps += 1
                 self.total_steps += 1
 
@@ -110,12 +157,15 @@ class Runner:
         evaluate_reward = 0
         self.agent.net.eval()
         for _ in range(self.args.evaluate_times):
-            state = self.env_evaluate.reset()
+            state, _ = self.env_evaluate.reset()
+
+            print(state)
             done = False
             episode_reward = 0
             while not done:
                 action = self.agent.choose_action(state, epsilon=0)
-                next_state, reward, done, _ = self.env_evaluate.step(action)
+                next_state, reward, terminated, truncated, _ = self.env_evaluate.step({"binary": action, "continuous": [0.0, 0.0, 0.0] })
+                done = terminated or truncated
                 episode_reward += reward
                 state = next_state
             evaluate_reward += episode_reward
@@ -123,8 +173,12 @@ class Runner:
         evaluate_reward /= self.args.evaluate_times
         self.evaluate_rewards.append(evaluate_reward)
         print("total_steps:{} \t evaluate_reward:{} \t epsilon：{}".format(self.total_steps, evaluate_reward, self.epsilon))
-        self.writer.add_scalar('step_rewards_{}'.format(self.env_name), evaluate_reward, global_step=self.total_steps)
+        # self.writer.add_scalar('step_rewards_{}'.format(self.env_name), evaluate_reward, global_step=self.total_steps)
 
+    def wrap_env(self, env):
+        env = ObservationWrapper(env)
+        env = gym.wrappers.TransformReward(env, lambda r: r * 0.01)
+        return env
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser("Hyperparameter Setting for DQN")
@@ -157,8 +211,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    env_names = ['CartPole-v1', 'LunarLander-v2']
-    env_index = 1
+    env_names = [DEFAULT_ENV]
+    env_index = 0
     for seed in [0, 10, 100]:
         runner = Runner(args=args, env_name=env_names[env_index], number=1, seed=seed)
         runner.run()

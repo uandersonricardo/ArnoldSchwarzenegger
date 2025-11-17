@@ -1,5 +1,5 @@
-from .dqn import DQNRecurrent, DQNFeedforward
-from ..utils import bool_flag
+from src.arnold.model.dqn import DQNRecurrent, DQNFeedforward
+from src.arnold.utils import bool_flag
 
 
 models = {

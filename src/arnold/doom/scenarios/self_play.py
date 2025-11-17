@@ -3,7 +3,7 @@ import argparse
 
 import torch.multiprocessing as mp
 
-from src.parameter_server import ParameterServer
+from src.arnold.parameter_server import ParameterServer
 
 
 def worker_fn_factory(fn):

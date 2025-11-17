@@ -7,11 +7,11 @@ from collections import namedtuple
 from vizdoom import DoomGame, GameVariable
 from vizdoom import ScreenResolution, ScreenFormat, Mode
 
-from src.doom.utils import process_buffers
-from src.doom.reward import RewardBuilder
-from src.doom.actions import add_buttons
-from src.doom.labels import parse_labels_mapping
-from src.doom.game_features import parse_game_features
+from src.arnold.doom.utils import process_buffers
+from src.arnold.doom.reward import RewardBuilder
+from src.arnold.doom.actions import add_buttons
+from src.arnold.doom.labels import parse_labels_mapping
+from src.arnold.doom.game_features import parse_game_features
 
 
 RESOURCES_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'resources')
