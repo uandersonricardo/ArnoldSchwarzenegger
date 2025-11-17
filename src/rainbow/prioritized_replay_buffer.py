@@ -23,7 +23,7 @@ class PrioritizedReplayBuffer(ReplayBuffer):
     
     def __init__(
         self, 
-        obs_dim: int,
+        state_dim: int,
         size: int, 
         batch_size: int = 32, 
         alpha: float = 0.6
@@ -31,7 +31,7 @@ class PrioritizedReplayBuffer(ReplayBuffer):
         """Initialization."""
         assert alpha >= 0
         
-        super(PrioritizedReplayBuffer, self).__init__(obs_dim, size, batch_size)
+        super(PrioritizedReplayBuffer, self).__init__(state_dim, size, batch_size)
         self.max_priority, self.tree_ptr = 1.0, 0
         self.alpha = alpha
         
@@ -45,14 +45,14 @@ class PrioritizedReplayBuffer(ReplayBuffer):
         
     def store(
         self, 
-        obs: np.ndarray, 
-        act: int, 
-        rew: float, 
-        next_obs: np.ndarray, 
+        states: np.ndarray, 
+        action: int, 
+        reward: float, 
+        next_states: np.ndarray, 
         done: bool
     ):
         """Store experience and priority."""
-        super().store(obs, act, rew, next_obs, done)
+        super().store(states, action, reward, next_states, done)
         
         self.sum_tree[self.tree_ptr] = self.max_priority ** self.alpha
         self.min_tree[self.tree_ptr] = self.max_priority ** self.alpha
@@ -65,19 +65,19 @@ class PrioritizedReplayBuffer(ReplayBuffer):
         
         indices = self._sample_proportional()
         
-        obs = self.obs_buf[indices]
-        next_obs = self.next_obs_buf[indices]
-        acts = self.acts_buf[indices]
-        rews = self.rews_buf[indices]
-        done = self.done_buf[indices]
+        states = self.obs_buf[indices]
+        next_states = self.next_obs_buf[indices]
+        actions = self.acts_buf[indices]
+        rewards = self.rews_buf[indices]
+        dones = self.done_buf[indices]
         weights = np.array([self._calculate_weight(i, beta) for i in indices])
         
-        return dict(
-            obs=obs,
-            next_obs=next_obs,
-            acts=acts,
-            rews=rews,
-            done=done,
+        return Dict(
+            state=states,
+            next_state=next_states,
+            action=actions,
+            reward=rewards,
+            done=dones,
             weights=weights,
             indices=indices,
         )

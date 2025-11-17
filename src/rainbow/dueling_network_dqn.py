@@ -2,8 +2,9 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from src.doom.game import Game
+from src.rainbow.dqn import DQNAgent
 
-from dqn import DQNAgent
+from typing import Dict
 
 class DuelingNetworkDQNAgent(DQNAgent):
     """Dueling DQN Agent interacting with environment.
@@ -56,13 +57,13 @@ class DuelingNetworkDQNAgent(DQNAgent):
     Override _compute_dqn_loss to implement Dueling DQN logic.
     The Dueling DQN architecture separates the estimation of state-value and advantage functions.
     """
-    def _compute_dqn_loss(self, samples:dict[str, np.ndarray]) -> torch.Tensor:
+    def _compute_dqn_loss(self, samples: Dict[str, np.ndarray]) -> torch.Tensor:
         """Return dqn loss."""
         device = self.device  # for shortening the following lines
-        state = torch.FloatTensor(samples["obs"]).to(device)
-        next_state = torch.FloatTensor(samples["next_obs"]).to(device)
-        action = torch.LongTensor(samples["acts"].reshape(-1, 1)).to(device)
-        reward = torch.FloatTensor(samples["rews"].reshape(-1, 1)).to(device)
+        state = torch.FloatTensor(samples["state"]).to(device)
+        next_state = torch.FloatTensor(samples["next_state"]).to(device)
+        action = torch.LongTensor(samples["action"].reshape(-1, 1)).to(device)
+        reward = torch.FloatTensor(samples["reward"].reshape(-1, 1)).to(device)
         done = torch.FloatTensor(samples["done"].reshape(-1, 1)).to(device)
 
         # G_t   = r + gamma * v(s_{t+1})  if state != Terminal

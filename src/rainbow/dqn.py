@@ -8,6 +8,8 @@ from src.doom.game import Game
 from src.rainbow.replay_buffer import ReplayBuffer
 from src.rainbow.network import Network
 
+from typing import Dict
+
 class DQNAgent:
     """DQN Agent interacting with environment.
     
@@ -200,7 +202,7 @@ class DQNAgent:
         # reset
         self.game = naive_game
 
-    def _compute_dqn_loss(self, samples: dict[str, np.ndarray]) -> torch.Tensor:
+    def _compute_dqn_loss(self, samples: Dict[str, np.ndarray]) -> torch.Tensor:
         """Return dqn loss."""
         device = self.device  # for shortening the following lines
         state = torch.FloatTensor(samples["state"]).to(device)
