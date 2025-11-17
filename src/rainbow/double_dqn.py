@@ -1,9 +1,10 @@
 import numpy as np
 import torch
 import torch.nn.functional as F
-from src.doom.game import Game
 
 from dqn import DQNAgent
+from src.doom.game import Game
+from typing import Dict
 
 class DoubleDQNAgent(DQNAgent):
     """Double DQN Agent interacting with environment.
@@ -72,7 +73,7 @@ class DoubleDQNAgent(DQNAgent):
     In Double DQN, the action selection is done using the online network,
     while the evaluation is done using the target network.
     """
-    def _compute_dqn_loss(self, samples: dict[str, np.ndarray]) -> torch.Tensor:
+    def _compute_dqn_loss(self, samples: Dict[str, np.ndarray]) -> torch.Tensor:
         """Return dqn loss."""
         device = self.device  # for shortening the following lines
         state = torch.FloatTensor(samples["state"]).to(device)

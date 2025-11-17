@@ -3,13 +3,13 @@ import os
 import numpy as np
 import torch
 
-from src.utils import get_dump_path
-from src.logger import get_logger
+from src.doom.actions import ActionBuilder
 from src.doom.game import Game
 from src.doom.reward import parse_reward_values
-from src.doom.actions import ActionBuilder
-from src.rainbow.dqn import DQNAgent
+from src.logger import get_logger
 from src.rainbow.args import parse_game_args
+from src.rainbow.dqn import DQNAgent
+from src.utils import get_dump_path
 
 # Parameters
 seed = 777

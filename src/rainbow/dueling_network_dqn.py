@@ -1,10 +1,11 @@
+from typing import Dict
+
 import numpy as np
 import torch
 import torch.nn.functional as F
+
 from src.doom.game import Game
 from src.rainbow.dqn import DQNAgent
-
-from typing import Dict
 
 class DuelingNetworkDQNAgent(DQNAgent):
     """Dueling DQN Agent interacting with environment.

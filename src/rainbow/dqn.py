@@ -1,12 +1,12 @@
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
 
 from src.doom.game import Game
-from src.rainbow.replay_buffer import ReplayBuffer
 from src.rainbow.network import Network
+from src.rainbow.replay_buffer import ReplayBuffer
 
 from typing import Dict
 

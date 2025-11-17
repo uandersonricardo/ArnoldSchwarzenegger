@@ -1,8 +1,8 @@
 import argparse
 
-from src.utils import bool_flag, map_ids_flag, bcast_json_list
-from src.doom.utils import get_n_feature_maps
 from src.doom.game_features import parse_game_features
+from src.doom.utils import get_n_feature_maps
+from src.utils import bool_flag, map_ids_flag, bcast_json_list
 
 def parse_game_args():
     parser = argparse.ArgumentParser(description='Arnold Schwarzenegger')

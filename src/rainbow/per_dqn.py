@@ -1,15 +1,14 @@
-from dqn import DQNAgent
+from typing import Dict
 
 import numpy as np
 import torch
-import torch.optim as optim
 import torch.nn.functional as F
+import torch.optim as optim
 
-from src.doom.game import Game
-from prioritized_replay_buffer import PrioritizedReplayBuffer
+from dqn import DQNAgent
 from network import Network
-
-from typing import Dict
+from prioritized_replay_buffer import PrioritizedReplayBuffer
+from src.doom.game import Game
 
 class PERDQNAgent(DQNAgent):
     """PER DQN Agent interacting with environment.

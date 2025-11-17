@@ -1,7 +1,5 @@
+from typing import Dict
 import numpy as np
-# import torch
-# from collections import deque
-# from sum_tree import SumTree
 
 class ReplayBuffer:
     """A simple numpy replay buffer."""
@@ -35,9 +33,9 @@ class ReplayBuffer:
         self.count = (self.count + 1) % self.buffer_capacity
         self.current_size = min(self.current_size + 1, self.buffer_capacity)
 
-    def sample(self) -> dict(str, np.ndarray):
+    def sample(self) -> Dict[str, np.ndarray]:
         idxs = np.random.choice(self.current_size, size=self.batch_size, replace=False)
-        return dict(state=self.buffer['state'][idxs],
+        return Dict(state=self.buffer['state'][idxs],
                     next_state=self.buffer['next_state'][idxs],
                     action=self.buffer['action'][idxs],
                     reward=self.buffer['reward'][idxs],

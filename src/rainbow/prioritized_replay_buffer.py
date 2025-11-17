@@ -3,7 +3,7 @@ import random
 from typing import Dict, List, Tuple
 
 import numpy as np
-        
+
 from segment_tree import MinSegmentTree, SumSegmentTree
 
 from ArnoldSchwarzenegger.src.rainbow.replay_buffer import ReplayBuffer
