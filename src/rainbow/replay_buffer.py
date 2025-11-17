@@ -12,14 +12,15 @@ class ReplayBuffer(object):
         self.buffer_capacity = args.buffer_capacity
         self.current_size = 0
         self.count = 0
-        self.buffer = {'state': np.zeros((self.buffer_capacity, args.state_dim)),
-                       'action': np.zeros((self.buffer_capacity, 1)),
-                       'reward': np.zeros(self.buffer_capacity),
-                       'next_state': np.zeros((self.buffer_capacity, args.state_dim)),
-                       'terminal': np.zeros(self.buffer_capacity),
-                       }
+        self.buffer = {
+            'state': np.zeros((self.buffer_capacity, args.state_dim)),
+            'action': np.zeros((self.buffer_capacity, 1)),
+            'reward': np.zeros(self.buffer_capacity),
+            'next_state': np.zeros((self.buffer_capacity, args.state_dim)),
+            'terminal': np.zeros(self.buffer_capacity),
+        }
 
-    def store_transition(self, state, action, reward, next_state, terminal, done):
+    def store(self, state, action, reward, next_state, terminal, done):
         self.buffer['state'][self.count] = state
         self.buffer['action'][self.count] = action
         self.buffer['reward'][self.count] = reward
@@ -28,7 +29,7 @@ class ReplayBuffer(object):
         self.count = (self.count + 1) % self.buffer_capacity  # When the 'count' reaches buffer_capacity, it will be reset to 0.
         self.current_size = min(self.current_size + 1, self.buffer_capacity)
 
-    def sample(self, total_steps):
+    def sample(self, _total_steps):
         index = np.random.randint(0, self.current_size, size=self.batch_size)
         batch = {}
         for key in self.buffer.keys():  # numpy->tensor
@@ -40,7 +41,7 @@ class ReplayBuffer(object):
         return batch, None, None
 
 
-class N_Steps_ReplayBuffer(object):
+class NStepsReplayBuffer(object):
     def __init__(self, args):
         self.gamma = args.gamma
         self.batch_size = args.batch_size
@@ -49,14 +50,15 @@ class N_Steps_ReplayBuffer(object):
         self.count = 0
         self.n_steps = args.n_steps
         self.n_steps_deque = deque(maxlen=self.n_steps)
-        self.buffer = {'state': np.zeros((self.buffer_capacity, args.state_dim)),
-                       'action': np.zeros((self.buffer_capacity, 1)),
-                       'reward': np.zeros(self.buffer_capacity),
-                       'next_state': np.zeros((self.buffer_capacity, args.state_dim)),
-                       'terminal': np.zeros(self.buffer_capacity),
-                       }
+        self.buffer = {
+            'state': np.zeros((self.buffer_capacity, args.state_dim)),
+            'action': np.zeros((self.buffer_capacity, 1)),
+            'reward': np.zeros(self.buffer_capacity),
+            'next_state': np.zeros((self.buffer_capacity, args.state_dim)),
+            'terminal': np.zeros(self.buffer_capacity),
+        }
 
-    def store_transition(self, state, action, reward, next_state, terminal, done):
+    def store(self, state, action, reward, next_state, terminal, done):
         transition = (state, action, reward, next_state, terminal, done)
         self.n_steps_deque.append(transition)
         if len(self.n_steps_deque) == self.n_steps:
@@ -81,7 +83,7 @@ class N_Steps_ReplayBuffer(object):
 
         return state, action, n_steps_reward, next_state, terminal
 
-    def sample(self, total_steps):
+    def sample(self, _total_steps):
         index = np.random.randint(0, self.current_size, size=self.batch_size)
         batch = {}
         for key in self.buffer.keys():  # numpy->tensor
@@ -93,7 +95,7 @@ class N_Steps_ReplayBuffer(object):
         return batch, None, None
 
 
-class Prioritized_ReplayBuffer(object):
+class PrioritizedReplayBuffer(object):
     def __init__(self, args):
         self.max_train_steps = args.max_train_steps
         self.alpha = args.alpha
@@ -104,14 +106,15 @@ class Prioritized_ReplayBuffer(object):
         self.sum_tree = SumTree(self.buffer_capacity)
         self.current_size = 0
         self.count = 0
-        self.buffer = {'state': np.zeros((self.buffer_capacity, args.state_dim)),
-                       'action': np.zeros((self.buffer_capacity, 1)),
-                       'reward': np.zeros(self.buffer_capacity),
-                       'next_state': np.zeros((self.buffer_capacity, args.state_dim)),
-                       'terminal': np.zeros(self.buffer_capacity),
-                       }
+        self.buffer = {
+            'state': np.zeros((self.buffer_capacity, args.state_dim)),
+            'action': np.zeros((self.buffer_capacity, 1)),
+            'reward': np.zeros(self.buffer_capacity),
+            'next_state': np.zeros((self.buffer_capacity, args.state_dim)),
+            'terminal': np.zeros(self.buffer_capacity),
+        }
 
-    def store_transition(self, state, action, reward, next_state, terminal, _done):
+    def store(self, state, action, reward, next_state, terminal, _done):
         self.buffer['state'][self.count] = state
         self.buffer['action'][self.count] = action
         self.buffer['reward'][self.count] = reward
@@ -141,7 +144,7 @@ class Prioritized_ReplayBuffer(object):
             self.sum_tree.update(data_index=index, priority=priority)
 
 
-class N_Steps_Prioritized_ReplayBuffer(object):
+class NStepsPrioritizedReplayBuffer(object):
     def __init__(self, args):
         self.max_train_steps = args.max_train_steps
         self.alpha = args.alpha
@@ -153,16 +156,17 @@ class N_Steps_Prioritized_ReplayBuffer(object):
         self.sum_tree = SumTree(self.buffer_capacity)
         self.n_steps = args.n_steps
         self.n_steps_deque = deque(maxlen=self.n_steps)
-        self.buffer = {'state': np.zeros((self.buffer_capacity,) + args.state_dim),
-                       'action': np.zeros((self.buffer_capacity, 1)),
-                       'reward': np.zeros(self.buffer_capacity),
-                       'next_state': np.zeros((self.buffer_capacity,) + args.state_dim),
-                       'terminal': np.zeros(self.buffer_capacity),
-                       }
+        self.buffer = {
+            'state': np.zeros((self.buffer_capacity,) + args.state_dim),
+            'action': np.zeros((self.buffer_capacity, 1)),
+            'reward': np.zeros(self.buffer_capacity),
+            'next_state': np.zeros((self.buffer_capacity,) + args.state_dim),
+            'terminal': np.zeros(self.buffer_capacity),
+        }
         self.current_size = 0
         self.count = 0
 
-    def store_transition(self, state, action, reward, next_state, terminal, done):
+    def store(self, state, action, reward, next_state, terminal, done):
         transition = (state, action, reward, next_state, terminal, done)
         self.n_steps_deque.append(transition)
         if len(self.n_steps_deque) == self.n_steps:

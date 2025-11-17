@@ -34,11 +34,11 @@ class Runner:
         print("episode_limit={}".format(self.args.episode_limit))
 
         if args.use_per and args.use_n_steps:
-            self.replay_buffer = N_Steps_Prioritized_ReplayBuffer(args)
+            self.replay_buffer = NStepsPrioritizedReplayBuffer(args)
         elif args.use_per:
-            self.replay_buffer = Prioritized_ReplayBuffer(args)
+            self.replay_buffer = PrioritizedReplayBuffer(args)
         elif args.use_n_steps:
-            self.replay_buffer = N_Steps_ReplayBuffer(args)
+            self.replay_buffer = NStepsReplayBuffer(args)
         else:
             self.replay_buffer = ReplayBuffer(args)
         self.agent = DQN(args)
@@ -95,7 +95,7 @@ class Runner:
                 else:
                     terminal = False
 
-                self.replay_buffer.store_transition(state, action, reward, next_state, terminal, done)  # Store the transition
+                self.replay_buffer.store(state, action, reward, next_state, terminal, done)  # Store the transition
                 state = next_state
 
                 if self.replay_buffer.current_size >= self.args.batch_size:

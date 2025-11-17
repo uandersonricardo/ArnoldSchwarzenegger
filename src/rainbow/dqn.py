@@ -3,7 +3,7 @@ import copy
 import torch
 import numpy as np
 
-from src.rainbow.network import Dueling_Net, Net
+from src.rainbow.network import DuelingNet, Net
 
 
 class DQN(object):
@@ -28,7 +28,7 @@ class DQN(object):
             self.gamma = self.gamma ** args.n_steps
 
         if self.use_dueling:  # Whether to use the 'dueling network'
-            self.net = Dueling_Net(args)
+            self.net = DuelingNet(args)
         else:
             self.net = Net(args)
 
@@ -38,7 +38,6 @@ class DQN(object):
 
     def choose_action(self, state, epsilon):
         with torch.no_grad():
-            print("--- STATE SHAPE", state)
             state = torch.unsqueeze(torch.tensor(state, dtype=torch.float), 0)
             q = self.net(state)
             if np.random.uniform() > epsilon:

@@ -1,26 +1,19 @@
 import argparse
+import random
 
 import cv2
 import torch
 import numpy as np
 import gymnasium as gym
-# from torch.utils.tensorboard import SummaryWriter
-from vizdoom import gymnasium_wrapper
+from torch.utils.tensorboard import SummaryWriter
+from vizdoom import gymnasium_wrapper # pylint: disable=unused-import
 
 from src.rainbow.replay_buffer import *
 from src.rainbow.dqn import DQN
 
 # Constants
 DEFAULT_ENV = "VizdoomDeathmatch-v0"
-AVAILABLE_ENVS = [env for env in gym.envs.registry.keys() if "Vizdoom" in env]  # type: ignore
-
-# Height and width of the resized image
 IMAGE_SHAPE = (60, 80)
-
-# Training parameters
-TRAINING_TIMESTEPS = int(1e6)
-N_STEPS = 128
-N_ENVS = 8
 FRAME_SKIP = 4
 
 class ObservationWrapper(gym.ObservationWrapper):
@@ -32,10 +25,6 @@ class ObservationWrapper(gym.ObservationWrapper):
     This wrapper replaces the dictionary observation space with a simple
     Box space (i.e., only the RGB image), and also resizes the image to a
     smaller size.
-
-    NOTE: Ideally, you should set the image size to smaller in the scenario files
-          for faster running of ViZDoom. This can really impact performance,
-          and this code is pretty slow because of this!
     """
 
     def __init__(self, env, shape=IMAGE_SHAPE):
@@ -64,27 +53,28 @@ class Runner:
 
         self.env = self.wrap_env(gym.make(env_name, render_mode="human", frame_skip=FRAME_SKIP))
         self.env_evaluate = self.wrap_env(gym.make(env_name, render_mode="human", frame_skip=FRAME_SKIP))  # When evaluating the policy, we need to rebuild an environment
-        # self.env.seed(seed)
+
         self.env.action_space.seed(seed)
-        # self.env_evaluate.seed(seed)
         self.env_evaluate.action_space.seed(seed)
         np.random.seed(seed)
         torch.manual_seed(seed)
+        torch.cuda.manual_seed(seed)
+        random.seed(seed)
 
         self.args.state_dim = self.env.observation_space.shape
         self.args.action_dim = self.env.action_space["binary"].n
-        # self.args.episode_limit = self.env._max_episode_steps  # Maximum number of steps per episode
+        self.args.episode_limit = self.args.episode_limit  # Maximum number of steps per episode
         print("env={}".format(self.env_name))
         print("state_dim={}".format(self.args.state_dim))
         print("action_dim={}".format(self.args.action_dim))
-        # print("episode_limit={}".format(self.args.episode_limit))
+        print("episode_limit={}".format(self.args.episode_limit))
 
         if args.use_per and args.use_n_steps:
-            self.replay_buffer = N_Steps_Prioritized_ReplayBuffer(args)
+            self.replay_buffer = NStepsPrioritizedReplayBuffer(args)
         elif args.use_per:
-            self.replay_buffer = Prioritized_ReplayBuffer(args)
+            self.replay_buffer = PrioritizedReplayBuffer(args)
         elif args.use_n_steps:
-            self.replay_buffer = N_Steps_ReplayBuffer(args)
+            self.replay_buffer = NStepsReplayBuffer(args)
         else:
             self.replay_buffer = ReplayBuffer(args)
         self.agent = DQN(args)
@@ -102,9 +92,9 @@ class Runner:
             if args.use_per:
                 self.algorithm += '_PER'
             if args.use_n_steps:
-                self.algorithm += "_N_steps"
+                self.algorithm += "_N_Steps"
 
-        # self.writer = SummaryWriter(log_dir='runs/DQN/{}_env_{}_number_{}_seed_{}'.format(self.algorithm, env_name, number, seed))
+        self.writer = SummaryWriter(log_dir='runs/DQN/{}_env_{}_number_{}_seed_{}'.format(self.algorithm, env_name, number, seed))
 
         self.evaluate_num = 0  # Record the number of evaluations
         self.evaluate_rewards = []  # Record the rewards during the evaluating
@@ -136,13 +126,11 @@ class Runner:
                 # terminal means dead or win,there is no next state s';
                 # but when reaching the max_episode_steps,there is a next state s' actually.
                 if done and episode_steps != self.args.episode_limit:
-                    if self.env_name == 'LunarLander-v2':
-                        if reward <= -100: reward = -1  # good for LunarLander
                     terminal = True
                 else:
                     terminal = False
 
-                self.replay_buffer.store_transition(state, action, reward, next_state, terminal, done)  # Store the transition
+                self.replay_buffer.store(state, action, reward, next_state, terminal, done)  # Store the transition
                 state = next_state
 
                 if self.replay_buffer.current_size >= self.args.batch_size:
@@ -158,8 +146,6 @@ class Runner:
         self.agent.net.eval()
         for _ in range(self.args.evaluate_times):
             state, _ = self.env_evaluate.reset()
-
-            print(state)
             done = False
             episode_reward = 0
             while not done:
@@ -173,7 +159,7 @@ class Runner:
         evaluate_reward /= self.args.evaluate_times
         self.evaluate_rewards.append(evaluate_reward)
         print("total_steps:{} \t evaluate_reward:{} \t epsilon：{}".format(self.total_steps, evaluate_reward, self.epsilon))
-        # self.writer.add_scalar('step_rewards_{}'.format(self.env_name), evaluate_reward, global_step=self.total_steps)
+        self.writer.add_scalar('step_rewards_{}'.format(self.env_name), evaluate_reward, global_step=self.total_steps)
 
     def wrap_env(self, env):
         env = ObservationWrapper(env)
@@ -185,6 +171,7 @@ if __name__ == '__main__':
     parser.add_argument("--max_train_steps", type=int, default=int(4e5), help=" Maximum number of training steps")
     parser.add_argument("--evaluate_freq", type=float, default=1e3, help="Evaluate the policy every 'evaluate_freq' steps")
     parser.add_argument("--evaluate_times", type=float, default=3, help="Evaluate times")
+    parser.add_argument("--episode_limit", type=int, default=int(1e6), help="Maximum number of steps per episode")
 
     parser.add_argument("--buffer_capacity", type=int, default=int(1e5), help="The maximum replay-buffer capacity ")
     parser.add_argument("--batch_size", type=int, default=256, help="batch size")
@@ -211,8 +198,6 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    env_names = [DEFAULT_ENV]
-    env_index = 0
     for seed in [0, 10, 100]:
-        runner = Runner(args=args, env_name=env_names[env_index], number=1, seed=seed)
+        runner = Runner(args=args, env_name=DEFAULT_ENV, number=1, seed=seed)
         runner.run()

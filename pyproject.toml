@@ -9,6 +9,7 @@ dependencies = [
     "matplotlib>=3.10.7",
     "opencv-python>=4.12.0.88",
     "segment-tree>=0.3.2",
+    "tensorboard>=2.20.0",
     "torch>=2.9.0",
     "torchvision>=0.24.0",
     "vizdoom>=1.2.4",

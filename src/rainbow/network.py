@@ -5,9 +5,27 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class Dueling_Net(nn.Module):
+class Net(nn.Module):
     def __init__(self, args):
-        super(Dueling_Net, self).__init__()
+        super(Net, self).__init__()
+        self.fc1 = nn.Linear(args.state_dim[0] * args.state_dim[1] * args.state_dim[2], args.hidden_dim)
+        self.fc2 = nn.Linear(args.hidden_dim, args.hidden_dim)
+        if args.use_noisy:
+            self.fc3 = NoisyLinear(args.hidden_dim, args.action_dim)
+        else:
+            self.fc3 = nn.Linear(args.hidden_dim, args.action_dim)
+
+    def forward(self, s):
+        s = s.flatten(start_dim=1)
+        s = torch.relu(self.fc1(s))
+        s = torch.relu(self.fc2(s))
+        Q = self.fc3(s)
+        return Q
+
+
+class DuelingNet(nn.Module):
+    def __init__(self, args):
+        super(DuelingNet, self).__init__()
         self.fc1 = nn.Linear(args.state_dim[0] * args.state_dim[1] * args.state_dim[2], args.hidden_dim)
         self.fc2 = nn.Linear(args.hidden_dim, args.hidden_dim)
         if args.use_noisy:
@@ -18,29 +36,12 @@ class Dueling_Net(nn.Module):
             self.A = nn.Linear(args.hidden_dim, args.action_dim)
 
     def forward(self, s):
-        s = s.view(s.size(0), -1)
+        s = s.flatten(start_dim=1)
         s = torch.relu(self.fc1(s))
         s = torch.relu(self.fc2(s))
         V = self.V(s)  # batch_size X 1
         A = self.A(s)  # batch_size X action_dim
         Q = V + (A - torch.mean(A, dim=-1, keepdim=True))  # Q(s,a)=V(s)+A(s,a)-mean(A(s,a))
-        return Q
-
-
-class Net(nn.Module):
-    def __init__(self, args):
-        super(Net, self).__init__()
-        self.fc1 = nn.Linear(args.state_dim, args.hidden_dim)
-        self.fc2 = nn.Linear(args.hidden_dim, args.hidden_dim)
-        if args.use_noisy:
-            self.fc3 = NoisyLinear(args.hidden_dim, args.action_dim)
-        else:
-            self.fc3 = nn.Linear(args.hidden_dim, args.action_dim)
-
-    def forward(self, s):
-        s = torch.relu(self.fc1(s))
-        s = torch.relu(self.fc2(s))
-        Q = self.fc3(s)
         return Q
 
 
