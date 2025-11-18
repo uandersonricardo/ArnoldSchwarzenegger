@@ -8,41 +8,75 @@ import torch.nn.functional as F
 class Net(nn.Module):
     def __init__(self, args):
         super(Net, self).__init__()
-        self.fc1 = nn.Linear(args.state_dim[0] * args.state_dim[1] * args.state_dim[2], args.hidden_dim)
-        self.fc2 = nn.Linear(args.hidden_dim, args.hidden_dim)
+        self.conv1 = nn.Conv2d(in_channels=args.state_dim[2], out_channels=32, kernel_size=(8, 8), stride=(4, 4))
+        self.bn1 = nn.BatchNorm2d(32)
+        self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=(4, 4), stride=(2, 2))
+        self.bn2 = nn.BatchNorm2d(64)
+        self.dropout = nn.Dropout(p=0.5)
+
+        convw = self._conv2d_size_out(self._conv2d_size_out(args.state_dim[0], 8, 4), 4, 2)
+        convh = self._conv2d_size_out(self._conv2d_size_out(args.state_dim[1], 8, 4), 4, 2)
+        linear_input_size = convw * convh * 64
+
         if args.use_noisy:
-            self.fc3 = NoisyLinear(args.hidden_dim, args.action_dim)
+            self.fc1 = NoisyLinear(linear_input_size, args.action_dim)
         else:
-            self.fc3 = nn.Linear(args.hidden_dim, args.action_dim)
+            self.fc1 = nn.Linear(linear_input_size, args.action_dim)
 
     def forward(self, s):
+        s = s / 255.0  # normalize pixel values
+        s = s.permute(0, 3, 1, 2)  # change from NHWC to NCHW
+        s = torch.relu(self.conv1(s))
+        s = self.bn1(s)
+        s = torch.relu(self.conv2(s))
+        s = self.bn2(s)
+        s = self.dropout(s)
         s = s.flatten(start_dim=1)
-        s = torch.relu(self.fc1(s))
-        s = torch.relu(self.fc2(s))
-        Q = self.fc3(s)
+        Q = self.fc1(s)
         return Q
+
+    def _conv2d_size_out(self, size, kernel_size, stride):
+        return (size - (kernel_size - 1) - 1) // stride + 1
 
 
 class DuelingNet(nn.Module):
     def __init__(self, args):
         super(DuelingNet, self).__init__()
-        self.fc1 = nn.Linear(args.state_dim[0] * args.state_dim[1] * args.state_dim[2], args.hidden_dim)
-        self.fc2 = nn.Linear(args.hidden_dim, args.hidden_dim)
+        self.conv1 = nn.Conv2d(in_channels=args.state_dim[2], out_channels=32, kernel_size=(8, 8), stride=(4, 4))
+        self.bn1 = nn.BatchNorm2d(32)
+        self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=(4, 4), stride=(2, 2))
+        self.bn2 = nn.BatchNorm2d(64)
+        self.dropout = nn.Dropout(p=0.5)
+        # self.fc1 = nn.Linear(args.state_dim[0] * args.state_dim[1] * args.state_dim[2], args.hidden_dim)
+        # self.fc2 = nn.Linear(args.hidden_dim, args.hidden_dim)
+
+        convw = self._conv2d_size_out(self._conv2d_size_out(args.state_dim[0], 8, 4), 4, 2)
+        convh = self._conv2d_size_out(self._conv2d_size_out(args.state_dim[1], 8, 4), 4, 2)
+        linear_input_size = convw * convh * 64
+
         if args.use_noisy:
-            self.V = NoisyLinear(args.hidden_dim, 1)
-            self.A = NoisyLinear(args.hidden_dim, args.action_dim)
+            self.V = NoisyLinear(linear_input_size, 1)
+            self.A = NoisyLinear(linear_input_size, args.action_dim)
         else:
-            self.V = nn.Linear(args.hidden_dim, 1)
-            self.A = nn.Linear(args.hidden_dim, args.action_dim)
+            self.V = nn.Linear(linear_input_size, 1)
+            self.A = nn.Linear(linear_input_size, args.action_dim)
 
     def forward(self, s):
+        s = s / 255.0  # normalize pixel values
+        s = s.permute(0, 3, 1, 2)  # change from NHWC to NCHW
+        s = torch.relu(self.conv1(s))
+        s = self.bn1(s)
+        s = torch.relu(self.conv2(s))
+        s = self.bn2(s)
+        s = self.dropout(s)
         s = s.flatten(start_dim=1)
-        s = torch.relu(self.fc1(s))
-        s = torch.relu(self.fc2(s))
         V = self.V(s)  # batch_size X 1
         A = self.A(s)  # batch_size X action_dim
         Q = V + (A - torch.mean(A, dim=-1, keepdim=True))  # Q(s,a)=V(s)+A(s,a)-mean(A(s,a))
         return Q
+
+    def _conv2d_size_out(self, size, kernel_size, stride):
+        return (size - (kernel_size - 1) - 1) // stride + 1
 
 
 class NoisyLinear(nn.Module):
