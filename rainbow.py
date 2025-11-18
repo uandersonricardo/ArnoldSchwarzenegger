@@ -62,6 +62,11 @@ class Runner:
         torch.cuda.manual_seed(seed)
         random.seed(seed)
 
+        if torch.backends.cudnn.enabled:
+            torch.cuda.manual_seed(seed)
+            torch.backends.cudnn.benchmark = False
+            torch.backends.cudnn.deterministic = True
+
         self.args.state_dim = self.env.observation_space.shape
         self.args.action_dim = self.env.action_space["binary"].n
         self.args.episode_limit = self.args.episode_limit  # Maximum number of steps per episode
@@ -187,6 +192,7 @@ if __name__ == '__main__':
     parser.add_argument("--evaluate_freq", type=float, default=1e3, help="Evaluate the policy every 'evaluate_freq' steps")
     parser.add_argument("--evaluate_times", type=float, default=3, help="Evaluate times")
     parser.add_argument("--episode_limit", type=int, default=int(1e6), help="Maximum number of steps per episode")
+    parser.add_argument("--seed", type=int, default=777, help="Random seed")
 
     parser.add_argument("--buffer_capacity", type=int, default=int(1e5), help="The maximum replay-buffer capacity ")
     parser.add_argument("--batch_size", type=int, default=256, help="batch size")
@@ -213,6 +219,5 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    for seed in [0, 10, 100]:
-        runner = Runner(args=args, env_name=DEFAULT_ENV, number=1, seed=seed)
-        runner.run()
+    runner = Runner(args=args, env_name=DEFAULT_ENV, number=1, seed=args.seed)
+    runner.run()

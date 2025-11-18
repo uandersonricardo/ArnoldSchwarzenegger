@@ -18,6 +18,9 @@ class DQN(object):
         self.target_update_freq = args.target_update_freq  # hard update
         self.update_count = 0
 
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print("Using device:", self.device)
+
         self.grad_clip = args.grad_clip
         self.use_lr_decay = args.use_lr_decay
         self.use_double = args.use_double
@@ -34,11 +37,15 @@ class DQN(object):
 
         self.target_net = copy.deepcopy(self.net)  # Copy the online_net to the target_net
 
+        # move networks to device before creating optimizer
+        self.net.to(self.device)
+        self.target_net.to(self.device)
+
         self.optimizer = torch.optim.Adam(self.net.parameters(), lr=self.lr)
 
     def choose_action(self, state, epsilon):
         with torch.no_grad():
-            state = torch.unsqueeze(torch.tensor(state, dtype=torch.float), 0)
+            state = torch.unsqueeze(torch.tensor(state, dtype=torch.float, device=self.device), 0)
             q = self.net(state)
             if np.random.uniform() > epsilon:
                 action = q.argmax(dim=-1).item()
@@ -49,21 +56,40 @@ class DQN(object):
     def learn(self, replay_buffer, total_steps):
         batch, batch_index, IS_weight = replay_buffer.sample(total_steps)
 
+        # convert batch items to tensors on the correct device
+        def to_device(x, dtype=torch.float):
+            if isinstance(x, torch.Tensor):
+                return x.to(self.device)
+            return torch.tensor(x, dtype=dtype, device=self.device)
+
+        state = to_device(batch['state'], dtype=torch.float)
+        next_state = to_device(batch['next_state'], dtype=torch.float)
+        reward = to_device(batch['reward'], dtype=torch.float)
+        terminal = to_device(batch['terminal'], dtype=torch.float)
+        action = to_device(batch['action'], dtype=torch.long)
+
+        # ensure action has a trailing dim for gather if needed
+        if action.dim() == 1:
+            action = action.unsqueeze(-1)
+
+        if self.use_per:
+            IS_weight = to_device(IS_weight, dtype=torch.float)
+
         with torch.no_grad():  # q_target has no gradient
             if self.use_double:  # Whether to use the 'double q-learning'
                 # Use online_net to select the action
-                a_argmax = self.net(batch['next_state']).argmax(dim=-1, keepdim=True)  # shape：(batch_size,1)
+                a_argmax = self.net(next_state).argmax(dim=-1, keepdim=True)  # shape：(batch_size,1)
                 # Use target_net to estimate the q_target
-                q_target = batch['reward'] + self.gamma * (1 - batch['terminal']) * self.target_net(batch['next_state']).gather(-1, a_argmax).squeeze(-1)  # shape：(batch_size,)
+                q_target = reward + self.gamma * (1 - terminal) * self.target_net(next_state).gather(-1, a_argmax).squeeze(-1)  # shape：(batch_size,)
             else:
-                q_target = batch['reward'] + self.gamma * (1 - batch['terminal']) * self.target_net(batch['next_state']).max(dim=-1)[0]  # shape：(batch_size,)
+                q_target = reward + self.gamma * (1 - terminal) * self.target_net(next_state).max(dim=-1)[0]  # shape：(batch_size,)
 
-        q_current = self.net(batch['state']).gather(-1, batch['action']).squeeze(-1)  # shape：(batch_size,)
+        q_current = self.net(state).gather(-1, action).squeeze(-1)  # shape：(batch_size,)
         td_errors = q_current - q_target  # shape：(batch_size,)
 
         if self.use_per:
             loss = (IS_weight * (td_errors ** 2)).mean()
-            replay_buffer.update_batch_priorities(batch_index, td_errors.detach().numpy())
+            replay_buffer.update_batch_priorities(batch_index, td_errors.detach().cpu().numpy())
         else:
             loss = (td_errors ** 2).mean()
 

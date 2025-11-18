@@ -47,8 +47,6 @@ class DuelingNet(nn.Module):
         self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=(4, 4), stride=(2, 2))
         self.bn2 = nn.BatchNorm2d(64)
         self.dropout = nn.Dropout(p=0.5)
-        # self.fc1 = nn.Linear(args.state_dim[0] * args.state_dim[1] * args.state_dim[2], args.hidden_dim)
-        # self.fc2 = nn.Linear(args.hidden_dim, args.hidden_dim)
 
         convw = self._conv2d_size_out(self._conv2d_size_out(args.state_dim[0], 8, 4), 4, 2)
         convh = self._conv2d_size_out(self._conv2d_size_out(args.state_dim[1], 8, 4), 4, 2)
