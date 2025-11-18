@@ -1,5 +1,6 @@
 import argparse
 import random
+from typing import SupportsFloat
 
 import cv2
 import torch
@@ -12,8 +13,8 @@ from src.rainbow.replay_buffer import *
 from src.rainbow.dqn import DQN
 
 # Constants
-DEFAULT_ENV = "VizdoomDeathmatch-v0"
-IMAGE_SHAPE = (60, 80)
+DEFAULT_ENV = "VizdoomDeathmatch-v1"
+IMAGE_SHAPE = (108, 60)
 FRAME_SKIP = 4
 
 class ObservationWrapper(gym.ObservationWrapper):
@@ -162,6 +163,20 @@ class Runner:
         self.writer.add_scalar('step_rewards_{}'.format(self.env_name), evaluate_reward, global_step=self.total_steps)
 
     def wrap_env(self, env):
+        # Customize the reward function
+        env.unwrapped.game.set_living_reward(-0.01)
+        env.unwrapped.game.set_death_reward(-1.0)
+        env.unwrapped.game.set_map_exit_reward(10.0)
+        env.unwrapped.game.set_kill_reward(1.0)
+        env.unwrapped.game.set_frag_reward(1.0)
+        env.unwrapped.game.set_secret_reward(1.0)
+        env.unwrapped.game.set_item_reward(0.5)
+        env.unwrapped.game.set_damage_made_reward(0.1)
+        env.unwrapped.game.set_hit_reward(0.1)
+        env.unwrapped.game.set_hit_taken_reward(-0.1)
+        env.unwrapped.game.set_damage_taken_reward(-0.1)
+
+        # Apply observation wrapper and reward scaling
         env = ObservationWrapper(env)
         env = gym.wrappers.TransformReward(env, lambda r: r * 0.01)
         return env
