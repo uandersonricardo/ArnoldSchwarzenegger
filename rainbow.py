@@ -181,6 +181,9 @@ class Runner:
         env.unwrapped.game.set_hit_taken_reward(-0.1)
         env.unwrapped.game.set_damage_taken_reward(-0.1)
 
+        # Set the render fps to 0 (no delay)
+        env.metadata['render_fps'] = 0
+
         # Apply observation wrapper and reward scaling
         env = ObservationWrapper(env)
         env = gym.wrappers.TransformReward(env, lambda r: r * 0.01)
