@@ -114,3 +114,10 @@ class DQN(object):
         lr_now = 0.9 * self.lr * (1 - total_steps / self.max_train_steps) + 0.1 * self.lr
         for p in self.optimizer.param_groups:
             p['lr'] = lr_now
+
+    def save_model(self, path):
+        torch.save(self.net.state_dict(), path)
+    
+    def load_model(self, path):
+        self.net.load_state_dict(torch.load(path, map_location=self.device))
+        self.target_net.load_state_dict(self.net.state_dict())

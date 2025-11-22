@@ -6,3 +6,6 @@ dumped/
 experiments/
 .venv/
 runs/
+checkpoints/
+log/
+LevDoom/

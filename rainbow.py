@@ -1,5 +1,7 @@
 import argparse
+import os
 import random
+import time
 from typing import SupportsFloat
 
 import cv2
@@ -51,6 +53,9 @@ class Runner:
         self.env_name = env_name
         self.number = number
         self.seed = seed
+        self.timestamp = int(np.floor(time.time()))
+        self.checkpoint = self.args.checkpoint
+        self.evaluate = self.args.evaluate
 
         self.env = self.wrap_env(gym.make(env_name, render_mode="human", frame_skip=FRAME_SKIP))
         self.env_evaluate = self.wrap_env(gym.make(env_name, render_mode="human", frame_skip=FRAME_SKIP))  # When evaluating the policy, we need to rebuild an environment
@@ -113,6 +118,14 @@ class Runner:
             self.epsilon_decay = (self.args.epsilon_init - self.args.epsilon_min) / self.args.epsilon_decay_steps
 
     def run(self, ):
+        if self.checkpoint is not None:
+            self.agent.load_model(self.checkpoint)
+            print("Loaded model from {}".format(self.checkpoint))
+
+        if self.evaluate:
+            self.evaluate_policy()
+            return
+
         self.evaluate_policy()
         while self.total_steps < self.args.max_train_steps:
             state, _ = self.env.reset()
@@ -150,6 +163,7 @@ class Runner:
     def evaluate_policy(self, ):
         evaluate_reward = 0
         self.agent.net.eval()
+
         for _ in range(self.args.evaluate_times):
             state, _ = self.env_evaluate.reset()
             done = False
@@ -161,32 +175,46 @@ class Runner:
                 episode_reward += reward
                 state = next_state
             evaluate_reward += episode_reward
-        self.agent.net.train()
+
         evaluate_reward /= self.args.evaluate_times
-        self.evaluate_rewards.append(evaluate_reward)
-        print("total_steps:{} \t evaluate_reward:{} \t epsilon：{}".format(self.total_steps, evaluate_reward, self.epsilon))
-        self.writer.add_scalar('step_rewards_{}'.format(self.env_name), evaluate_reward, global_step=self.total_steps)
+        
+        if self.evaluate:
+            print("Evaluate Num: {} \t Total Steps: {} \t Evaluate Reward: {}".format(self.evaluate_num, self.total_steps, evaluate_reward))
+        else:
+            self.evaluate_rewards.append(evaluate_reward)
+            self.writer.add_scalar('step_rewards_{}'.format(self.env_name), evaluate_reward, global_step=self.total_steps)
+
+            saved = False
+            if evaluate_reward >= max(self.evaluate_rewards):
+                if not os.path.exists('checkpoints'):
+                    os.makedirs('checkpoints')
+                self.agent.save_model('checkpoints/{}-{}.pth'.format(self.timestamp, self.algorithm))
+                saved = True
+                
+            print("Total Steps: {} \t Evaluate Reward: {} \t Epsilon： {} \t Model Saved: {}".format(self.total_steps, evaluate_reward, self.epsilon, saved))
+
+            self.agent.net.train()
 
     def wrap_env(self, env):
         # Customize the reward function
-        env.unwrapped.game.set_living_reward(-0.01)
-        env.unwrapped.game.set_death_reward(-1.0)
-        env.unwrapped.game.set_map_exit_reward(10.0)
-        env.unwrapped.game.set_kill_reward(1.0)
-        env.unwrapped.game.set_frag_reward(1.0)
-        env.unwrapped.game.set_secret_reward(1.0)
-        env.unwrapped.game.set_item_reward(0.5)
-        env.unwrapped.game.set_damage_made_reward(0.1)
-        env.unwrapped.game.set_hit_reward(0.1)
-        env.unwrapped.game.set_hit_taken_reward(-0.1)
-        env.unwrapped.game.set_damage_taken_reward(-0.1)
+        env.unwrapped.game.set_living_reward(-0.1)
+        env.unwrapped.game.set_death_reward(-10.0)
+        env.unwrapped.game.set_map_exit_reward(100.0)
+        env.unwrapped.game.set_kill_reward(10.0)
+        env.unwrapped.game.set_frag_reward(10.0)
+        env.unwrapped.game.set_secret_reward(10.0)
+        env.unwrapped.game.set_item_reward(5.0)
+        env.unwrapped.game.set_damage_made_reward(1.0)
+        env.unwrapped.game.set_hit_reward(1.0)
+        env.unwrapped.game.set_hit_taken_reward(-1.0)
+        env.unwrapped.game.set_damage_taken_reward(-1.0)
 
         # Set the render fps to 0 (no delay)
         env.metadata['render_fps'] = 0
 
         # Apply observation wrapper and reward scaling
         env = ObservationWrapper(env)
-        env = gym.wrappers.TransformReward(env, lambda r: r * 0.01)
+        # env = gym.wrappers.TransformReward(env, lambda r: r * 0.01)
         return env
 
 if __name__ == '__main__':
@@ -196,15 +224,17 @@ if __name__ == '__main__':
     parser.add_argument("--evaluate_times", type=float, default=3, help="Evaluate times")
     parser.add_argument("--episode_limit", type=int, default=int(1e6), help="Maximum number of steps per episode")
     parser.add_argument("--seed", type=int, default=777, help="Random seed")
+    parser.add_argument("--checkpoint", type=str, default=None, help="Path to load checkpoint")
+    parser.add_argument("--evaluate", type=bool, default=False, help="Whether to evaluate the model")
 
     parser.add_argument("--buffer_capacity", type=int, default=int(1e5), help="The maximum replay-buffer capacity ")
     parser.add_argument("--batch_size", type=int, default=256, help="batch size")
     parser.add_argument("--hidden_dim", type=int, default=256, help="The number of neurons in hidden layers of the neural network")
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate of actor")
     parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor")
-    parser.add_argument("--epsilon_init", type=float, default=0.5, help="Initial epsilon")
+    parser.add_argument("--epsilon_init", type=float, default=1, help="Initial epsilon")
     parser.add_argument("--epsilon_min", type=float, default=0.1, help="Minimum epsilon")
-    parser.add_argument("--epsilon_decay_steps", type=int, default=int(1e5), help="How many steps before the epsilon decays to the minimum")
+    parser.add_argument("--epsilon_decay_steps", type=int, default=int(1e6), help="How many steps before the epsilon decays to the minimum")
     parser.add_argument("--tau", type=float, default=0.005, help="soft update the target network")
     parser.add_argument("--use_soft_update", type=bool, default=True, help="Whether to use soft update")
     parser.add_argument("--target_update_freq", type=int, default=200, help="Update frequency of the target network(hard update)")
