@@ -59,7 +59,7 @@ def test(args: Namespace):
 
     # Create training and testing environments
     # train_envs = create_vec_env(scenario, args.train_levels, **kwargs)
-    test_envs = create_vec_env(scenario, args.test_levels, **kwargs)
+    test_envs = create_vec_env(scenario, args.test_levels, args.test_maps, **kwargs)
 
     # Apply the seed
     np.random.seed(args.seed)
@@ -105,10 +105,10 @@ def test(args: Namespace):
 
     test_collector.reset()
     result = test_collector.collect(n_episode=args.test_num, render=args.render_sleep)
-    reward = result["reward"].mean()
-    lengths = result["length"].mean() * args.frame_skip
-    print(f'Mean reward (over {result["n/ep"]} episodes): {reward}')
-    print(f'Mean length (over {result["n/ep"]} episodes): {lengths}')
+    # reward = result["reward"].mean()
+    # lengths = result["length"].mean() * args.frame_skip
+    # print(f'Mean reward (over {result["n/ep"]} episodes): {reward}')
+    # print(f'Mean length (over {result["n/ep"]} episodes): {lengths}')
 
     # train_collector.collect(n_step=args.batch_size * args.training_num)
 
@@ -119,10 +119,12 @@ def test(args: Namespace):
     pprint.pprint(result)
 
 
-def create_vec_env(scenario, levels, **kwargs):
+def create_vec_env(scenario, levels, maps, **kwargs):
     env_callables = []
     for level in levels:
-        env_callables.extend(levdoom.make_level_fns(scenario, level, **kwargs))
+        for map_id in maps:
+            kwargs['wrap']['map_id'] = map_id
+            env_callables.extend(levdoom.make_level_fns(scenario, level, **kwargs))
     return ShmemVectorEnv(env_callables)
 
 

@@ -1,0 +1,5 @@
+- Escolher quais mapas vai treinar as redes
+  - DQN, Rainbow e PPO
+  - Pode treinar testar 10 épocas no mapa 0 1
+- Escolher quais mapas vai avaliar
+  - Avaliar no mapa 2 3 4 

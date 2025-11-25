@@ -110,7 +110,7 @@ def parse_game_args(args):
     assert not params.reload or os.path.isfile(params.reload)
 
     # run scenario game
-    module = importlib.import_module('src.doom.scenarios.' + params.scenario,
+    module = importlib.import_module('src.arnold.doom.scenarios.' + params.scenario,
                                      package=__name__)
     module.main(parser, args)
 

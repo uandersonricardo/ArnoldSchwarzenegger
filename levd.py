@@ -6,16 +6,14 @@ from functools import partial
 
 import numpy as np
 import torch
+import levdoom
 from tensorboardX import SummaryWriter
 from tianshou.data.collector import Collector
 from tianshou.env import ShmemVectorEnv
 from tianshou.utils import TensorboardLogger
 from tianshou.utils.logger.wandb import WandbLogger
 
-import levdoom
-from levdoom import Scenario
 from src.levd.config import parse_args, Algorithm
-
 
 def train(args: Namespace):
     args.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -28,7 +26,7 @@ def train(args: Namespace):
     log_path = f'{args.logdir}/{args.algorithm}/{scenario_name}/{args.seed}_{args.timestamp}'
 
     # Determine the scenario and algorithm
-    scenario = Scenario[scenario_name.upper()]
+    scenario = levdoom.Scenario[scenario_name.upper()]
     algorithm_class = Algorithm[args.algorithm.upper()].value
 
     dummy_env = levdoom.make_level(scenario, 0)[0]
@@ -58,8 +56,8 @@ def train(args: Namespace):
     }
 
     # Create training and testing environments
-    train_envs = create_vec_env(scenario, args.train_levels, **kwargs)
-    test_envs = create_vec_env(scenario, args.test_levels, **kwargs)
+    train_envs = create_vec_env(scenario, args.train_levels, args.train_maps, **kwargs)
+    test_envs = create_vec_env(scenario, args.test_levels, args.test_maps, **kwargs)
 
     # Apply the seed
     np.random.seed(args.seed)
@@ -108,12 +106,15 @@ def train(args: Namespace):
     pprint.pprint(result)
 
 
-def create_vec_env(scenario, levels, **kwargs):
+def create_vec_env(scenario, levels, maps, **kwargs):
     env_callables = []
     for level in levels:
-        env_callables.extend(levdoom.make_level_fns(scenario, level, **kwargs))
+        for map_id in maps:
+            kwargs['wrap']['map_id'] = map_id
+            env_callables.extend(levdoom.make_level_fns(scenario, level, **kwargs))
     return ShmemVectorEnv(env_callables)
 
 
 if __name__ == '__main__':
+    print(levdoom.Scenario._member_names_)
     train(parse_args())

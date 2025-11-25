@@ -19,7 +19,7 @@ def parse_args() -> argparse.Namespace:
 
     # Core
     parser.add_argument('--scenario_name', type=str, default=None, required=True,
-                        choices=['defend_the_center', 'health_gathering', 'seek_and_slay', 'dodge_projectiles'])
+                        choices=['defend_the_center', 'health_gathering', 'seek_and_slay', 'dodge_projectiles', 'full_deathmatch'])
     parser.add_argument('--algorithm', type=str, default=None, required=True, choices=['dqn', 'ppo', 'rainbow'])
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--logdir', type=str, default='log')
@@ -53,12 +53,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--training-num', type=int, default=10)
     parser.add_argument('--buffer-size', type=int, default=1e5)
     parser.add_argument('--save-buffer-name', type=str, default=None)
+    parser.add_argument('--train_maps', type=int, nargs='*', default=[1])
 
     # Testing
     parser.add_argument('--test_levels', type=int, nargs='*', default=[2, 3, 4], choices=[0, 1, 2, 3, 4])
     parser.add_argument('--test_envs', type=str, nargs='*', default=['default'])
     parser.add_argument('--eps-test', type=float, default=0.005)
     parser.add_argument('--test-num', type=int, default=100)
+    parser.add_argument('--test_maps', type=int, nargs='*', default=[2])
 
     # RL
     parser.add_argument('--lr', type=float, default=2e-5)

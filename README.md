@@ -1,3 +1,32 @@
+# LEVDOOM
+
+Treino
+uv run levd.py --algorithm dqn --scenario defend_the_center --train_levels 0 1 --test_levels 2 3 4 --seed 1 --epoch 100 --lr 0.0001 --step-per-collect 10 --batch-size 64
+
+Epoch #1: 100001it [04:09, 400.13it/s, env_step=100000, len=118, loss=0.136, n/ep=0, n/st=16, rew=2.66]                                                                       
+Epoch #1: test_reward: 3.439600 ± 1.981931, best_reward: 3.439600 ± 1.981931 in #1
+Epoch #2: 100001it [04:09, 400.73it/s, env_step=200000, len=71, loss=0.131, n/ep=0, n/st=16, rew=1.79]                                                                        
+Epoch #2: test_reward: 4.225500 ± 1.894355, best_reward: 4.225500 ± 1.894355 in #2
+Epoch #3: 100001it [04:10, 399.98it/s, env_step=300000, len=101, loss=0.103, n/ep=0, n/st=16, rew=2.51]                                                                       
+Epoch #3: test_reward: 4.621900 ± 2.267661, best_reward: 4.621900 ± 2.267661 in #3
+Epoch #4: 100001it [04:09, 400.32it/s, env_step=400000, len=107, loss=0.091, n/ep=0, n/st=16, rew=3.71]                                                                       
+Epoch #4: test_reward: 3.950800 ± 2.029332, best_reward: 4.621900 ± 2.267661 in #3
+Epoch #5: 100001it [04:10, 399.89it/s, env_step=500000, len=191, loss=0.080, n/ep=0, n/st=16, rew=6.68]                                                                       
+Epoch #5: test_reward: 5.041700 ± 1.853443, best_reward: 5.041700 ± 1.853443 in #5
+Epoch #6: 100001it [04:07, 403.31it/s, env_step=600000, len=122, loss=0.074, n/ep=0, n/st=16, rew=4.67]                                                                       
+Epoch #6: test_reward: 5.109000 ± 1.928644, best_reward: 5.109000 ± 1.928644 in #6
+Epoch #7: 100001it [05:11, 320.84it/s, env_step=700000, len=83, loss=0.067, n/ep=0, n/st=16, rew=2.55]                                                                        
+Epoch #7: test_reward: 5.054600 ± 2.263414, best_reward: 5.109000 ± 1.928644 in #6
+Epoch #8: 100001it [05:42, 291.85it/s, env_step=800000, len=138, loss=0.063, n/ep=0, n/st=16, rew=5.70]                                                                       
+Epoch #8: test_reward: 5.533000 ± 1.941397, best_reward: 5.533000 ± 1.941397 in #8
+Epoch #9: 100001it [05:23, 308.86it/s, env_step=900000, len=180, loss=0.063, n/ep=0, n/st=16, rew=6.67]                                                                       
+Epoch #9: test_reward: 5.613200 ± 1.675593, best_reward: 5.613200 ± 1.675593 in #9
+
+Teste
+uv run levdw.py --algorithm dqn --scenario full_deathmatch --resume-path 1_20251123_231836/policy_best.pth --watch --render --test_levels 1
+
+uv run levdw.py --algorithm dqn --scenario full_deathmatch --resume-path 1_20251123_231836/policy_best.pth --watch --render --test_levels 0 --test_maps 2 4
+
 # Arnold
 
 Arnold is a PyTorch implementation of the agent presented in *Playing FPS Games with Deep Reinforcement Learning* (https://arxiv.org/abs/1609.05521), and that won the 2017 edition of the [*ViZDoom AI Competition*](http://vizdoom.cs.put.edu.pl/competition-cig-2017).

@@ -1,9 +1,9 @@
 import argparse
 import os
 
-from src.utils import get_dump_path
-from src.logger import get_logger
-from src.args import parse_game_args
+from src.arnold.utils import get_dump_path
+from src.arnold.logger import get_logger
+from src.arnold.args import parse_game_args
 
 
 parser = argparse.ArgumentParser(description='Arnold runner')

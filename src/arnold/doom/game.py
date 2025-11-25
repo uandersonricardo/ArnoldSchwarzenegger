@@ -14,7 +14,7 @@ from src.arnold.doom.labels import parse_labels_mapping
 from src.arnold.doom.game_features import parse_game_features
 
 
-RESOURCES_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'resources')
+RESOURCES_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), '..', 'resources')
 
 WEAPON_NAMES = [None, "Fist", "Pistol", "SuperShotgun", "Chaingun",
                 "RocketLauncher", "PlasmaRifle", "BFG9000"]
@@ -123,6 +123,7 @@ class Game(object):
         """
         # game resources
         game_filename = '%s.wad' % ('freedoom2' if freedoom else 'Doom2')
+        print(RESOURCES_DIR)
         self.scenario_path = os.path.join(RESOURCES_DIR, 'scenarios', '%s.wad' % scenario)
         self.game_path = os.path.join(RESOURCES_DIR, game_filename)
 
