@@ -50,18 +50,12 @@ class DoomEnv(gymnasium.Env):
         elif resolution:  # Use a particular predefined resolution
             self.game.set_screen_resolution(get_screen_resolution(resolution))
 
-        # self.game.add_game_args(
-        #     "-host 1 -deathmatch +timelimit 10.0 "
-        #     "+sv_forcerespawn 1 +sv_noautoaim 1 +sv_respawnprotect 1 +sv_spawnfarthest 1 +sv_nocrouch 1 "
-        #     "+viz_respawn_delay 10 +viz_nocheat 1"
-        # )
-        # self.game.add_game_args("+name AI +colorset 0")
-        # self.game.set_mode(vzd.Mode.PLAYER)
-        # self.game.set_console_enabled(True)
-        # self.game.set_window_visible(True)
-        # self.game.set_mode(vzd.Mode.ASYNC_PLAYER)
+        self.game.add_game_args(
+            "-host 1 -deathmatch +sv_cheats 1 "
+            "+sv_forcerespawn 1 +sv_noautoaim 1 +sv_respawnprotect 1 +sv_spawnfarthest 1 +sv_nocrouch 1 "
+            " +name AI +colorset 0 "
+        )
 
-        self.game.add_game_args('+sv_forcerespawn 1 +sv_noautoaim 1 +sv_cheats 1')
         self.game.init()
         
         self.update_bots()

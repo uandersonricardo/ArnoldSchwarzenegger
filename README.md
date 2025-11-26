@@ -3,6 +3,8 @@
 Treino
 uv run levd.py --algorithm dqn --scenario defend_the_center --train_levels 0 1 --test_levels 2 3 4 --seed 1 --epoch 100 --lr 0.0001 --step-per-collect 10 --batch-size 64
 
+uv run levd.py --algorithm dqn --scenario defend_the_center --train_levels 0 --train_maps 1 2 --test_levels 0 --test_maps 3 4 5 --seed 42 --epoch 20 --lr 0.0001 --step-per-collect 10 --batch-size 64
+
 Epoch #1: 100001it [04:09, 400.13it/s, env_step=100000, len=118, loss=0.136, n/ep=0, n/st=16, rew=2.66]                                                                       
 Epoch #1: test_reward: 3.439600 ± 1.981931, best_reward: 3.439600 ± 1.981931 in #1
 Epoch #2: 100001it [04:09, 400.73it/s, env_step=200000, len=71, loss=0.131, n/ep=0, n/st=16, rew=1.79]                                                                        
@@ -26,6 +28,8 @@ Teste
 uv run levdw.py --algorithm dqn --scenario full_deathmatch --resume-path 1_20251123_231836/policy_best.pth --watch --render --test_levels 1
 
 uv run levdw.py --algorithm dqn --scenario full_deathmatch --resume-path 1_20251123_231836/policy_best.pth --watch --render --test_levels 0 --test_maps 2 4
+
+uv run levdw.py --algorithm dqn --scenario full_deathmatch --resume-path 1_20251123_231836/policy_best.pth --watch --render --test_levels 0 --test_maps 1 2 3 4 5
 
 # Arnold
 

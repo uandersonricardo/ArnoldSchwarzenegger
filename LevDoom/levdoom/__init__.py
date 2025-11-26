@@ -106,11 +106,7 @@ env_mapping = {
         'DodgeProjectilesLevel4-v0': 'complete',
     },
     Scenario.FULL_DEATHMATCH: {
-        'FullDeathmatchLevel0-v0': 'default',
-        # 'FullDeathmatchLevel1_1-v0': 'map01',
-        # 'FullDeathmatchLevel1_1-v0': 'map02',
-        'FullDeathmatchLevel1_1-v0': 'mapsons',
-        'FullDeathmatchLevel2_1-v0': 'default',
+        'FullDeathmatchLevel0-v0': 'cig',
     },
 }
 

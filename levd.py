@@ -116,5 +116,4 @@ def create_vec_env(scenario, levels, maps, **kwargs):
 
 
 if __name__ == '__main__':
-    print(levdoom.Scenario._member_names_)
     train(parse_args())

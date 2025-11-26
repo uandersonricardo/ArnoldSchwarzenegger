@@ -5,21 +5,8 @@ import numpy as np
 
 from levdoom.envs.base import DoomEnv
 from levdoom.utils.utils import distance_traversed
-from levdoom.utils.wrappers import WrapperHolder, GameVariableRewardWrapper, MovementRewardWrapper
+from levdoom.utils.wrappers import WrapperHolder, GameVariableRewardWrapper, MovementRewardWrapper, ConstantRewardWrapper
 
-default_reward_values = {
-    'BASE_REWARD': 0.,
-    'DISTANCE': 0.,
-    'KILL': 5.,
-    'DEATH': -5.,
-    'SUICIDE': -5.,
-    'MEDIKIT': 1.,
-    'ARMOR': 1.,
-    'INJURED': -1.,
-    'WEAPON': 1.,
-    'AMMO': 1.,
-    'USE_AMMO': -0.2,
-}
 
 class FullDeathmatch(DoomEnv):
     """
@@ -33,18 +20,30 @@ class FullDeathmatch(DoomEnv):
 
     def __init__(self,
                  env: str,
-                 reward_kill: float = 1.0,
-                 penalty_health_loss: float = -0.01,
-                 penalty_ammo_used: float = -0.01,
-                 traversal_reward_scaler: float = 0.001,
-                 reward_frame_survived: float = 0.01,
+                 base_reward: float = 0.0,
+                 distance_reward: float = 0.0,
+                 kill_reward: float = 5.0,
+                 death_reward: float = -5.0,
+                 suicide_reward: float = -5.0,
+                 medikit_reward: float = 1.0,
+                 armor_reward: float = 1.0,
+                 injured_reward: float = -1.0,
+                 weapon_reward: float = 1.0,
+                 ammo_reward: float = 1.0,
+                 use_ammo_reward: float = -0.2,
                  **kwargs):
         super().__init__(env, **kwargs)
-        self.reward_kill = reward_kill
-        self.penalty_health_loss = penalty_health_loss
-        self.penalty_ammo_used = penalty_ammo_used
-        self.traversal_reward_scaler = traversal_reward_scaler
-        self.reward_frame_survived = reward_frame_survived
+        self.base_reward = base_reward
+        self.distance_reward = distance_reward
+        self.kill_reward = kill_reward
+        self.death_reward = death_reward
+        self.suicide_reward = suicide_reward
+        self.medikit_reward = medikit_reward
+        self.armor_reward = armor_reward
+        self.injured_reward = injured_reward
+        self.weapon_reward = weapon_reward
+        self.ammo_reward = ammo_reward
+        self.use_ammo_reward = use_ammo_reward
 
         self.kills = 0
         self.deaths = 0
@@ -145,7 +144,7 @@ class FullDeathmatch(DoomEnv):
         if current_vars[18] > previous_vars[18]:
             self.bfg9000 += 1
 
-        # Used ammo
+        # Found/used ammo
         if current_vars[2] < previous_vars[2] or current_vars[9] < previous_vars[9] or \
            current_vars[10] < previous_vars[10] or current_vars[11] < previous_vars[11]:
             self.ammo_used += 1
@@ -167,10 +166,50 @@ class FullDeathmatch(DoomEnv):
 
     def reward_wrappers_easy(self) -> List[WrapperHolder]:
         return [
-            WrapperHolder(MovementRewardWrapper, scaler=self.traversal_reward_scaler),
-            WrapperHolder(GameVariableRewardWrapper, reward=self.reward_kill, var_index=1),
-            WrapperHolder(GameVariableRewardWrapper, reward=self.penalty_health_loss, var_index=2, decrease=True),
-            WrapperHolder(GameVariableRewardWrapper, reward=self.penalty_ammo_used, var_index=3, decrease=True),
+            # Base reward
+            WrapperHolder(ConstantRewardWrapper, reward=self.base_reward),
+            # Distance reward
+            WrapperHolder(MovementRewardWrapper, scaler=self.distance_reward),
+            # Kill reward
+            WrapperHolder(GameVariableRewardWrapper, reward=self.kill_reward, var_index=1),
+            # Death reward
+            WrapperHolder(GameVariableRewardWrapper, reward=self.death_reward, var_index=8),
+            # Suicide reward
+            WrapperHolder(GameVariableRewardWrapper, reward=self.suicide_reward, var_index=5, decrease=True),
+            # Found medikit reward
+            WrapperHolder(GameVariableRewardWrapper, reward=self.medikit_reward, var_index=0),
+            # Injured reward
+            WrapperHolder(GameVariableRewardWrapper, reward=self.injured_reward, var_index=0, decrease=True),
+            # Found armor reward
+            WrapperHolder(GameVariableRewardWrapper, reward=self.armor_reward, var_index=7),
+            # Found pistol reward
+            WrapperHolder(GameVariableRewardWrapper, reward=self.weapon_reward, var_index=13),
+            # Found shotgun reward
+            WrapperHolder(GameVariableRewardWrapper, reward=self.weapon_reward, var_index=14),
+            # Found chaingun reward
+            WrapperHolder(GameVariableRewardWrapper, reward=self.weapon_reward, var_index=15),
+            # Found rocket launcher reward
+            WrapperHolder(GameVariableRewardWrapper, reward=self.weapon_reward, var_index=16),
+            # Found plasma rifle reward
+            WrapperHolder(GameVariableRewardWrapper, reward=self.weapon_reward, var_index=17),
+            # Found bfg9000 reward
+            WrapperHolder(GameVariableRewardWrapper, reward=self.weapon_reward, var_index=18),
+            # Found bullets reward
+            WrapperHolder(GameVariableRewardWrapper, reward=self.ammo_reward, var_index=2),
+            # Found shells reward
+            WrapperHolder(GameVariableRewardWrapper, reward=self.ammo_reward, var_index=9),
+            # Found rockets reward
+            WrapperHolder(GameVariableRewardWrapper, reward=self.ammo_reward, var_index=10),
+            # Found cells reward
+            WrapperHolder(GameVariableRewardWrapper, reward=self.ammo_reward, var_index=11),
+            # Used bullets reward
+            WrapperHolder(GameVariableRewardWrapper, reward=self.use_ammo_reward, var_index=2, decrease=True),
+            # Used shells reward
+            WrapperHolder(GameVariableRewardWrapper, reward=self.use_ammo_reward, var_index=9, decrease=True),
+            # Used rockets reward
+            WrapperHolder(GameVariableRewardWrapper, reward=self.use_ammo_reward, var_index=10, decrease=True),
+            # Used cells reward
+            WrapperHolder(GameVariableRewardWrapper, reward=self.use_ammo_reward, var_index=11, decrease=True),
         ]
 
     def reward_wrappers_hard(self) -> List[WrapperHolder]:
@@ -179,12 +218,31 @@ class FullDeathmatch(DoomEnv):
     def extra_statistics(self) -> Dict[str, float]:
         if not self.game_variable_buffer:
             return {}
+
         variables = self.game_variable_buffer[-1]
-        return {'health': variables[0],
-                'kills': variables[1],
-                'ammo_left': variables[2],
-                'movement': np.mean(self.distance_buffer).round(3),
-                'hits_taken': self.hits_taken}
+
+        return {
+            'health': variables[0],
+            'kills': self.kills,
+            'deaths': self.deaths,
+            'suicides': self.suicides,
+            'frags': self.frags,
+            'medikits': self.medikits,
+            'armors': self.armors,
+            'pistol': self.pistol,
+            'shotgun': self.shotgun,
+            'chaingun': self.chaingun,
+            'rocket_launcher': self.rocket_launcher,
+            'plasma_rifle': self.plasma_rifle,
+            'bfg9000': self.bfg9000,
+            'bullets': self.bullets,
+            'shells': self.shells,
+            'rockets': self.rockets,
+            'cells': self.cells,
+            'frames_survived': self.frames_survived,
+            'movement': np.mean(self.distance_buffer).round(3),
+            'hits_taken': self.hits_taken
+        }
 
     def clear_episode_statistics(self):
         super().clear_episode_statistics()
