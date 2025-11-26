@@ -20,4 +20,4 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-levdoom = { path = "./LevDoom", editable = true }
+levdoom = { path = "./libs/LevDoom", editable = true }

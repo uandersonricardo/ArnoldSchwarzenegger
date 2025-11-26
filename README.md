@@ -3,7 +3,7 @@
 Treino
 uv run levd.py --algorithm dqn --scenario defend_the_center --train_levels 0 1 --test_levels 2 3 4 --seed 1 --epoch 100 --lr 0.0001 --step-per-collect 10 --batch-size 64
 
-uv run levd.py --algorithm dqn --scenario defend_the_center --train_levels 0 --train_maps 1 2 --test_levels 0 --test_maps 3 4 5 --seed 42 --epoch 20 --lr 0.0001 --step-per-collect 10 --batch-size 64
+uv run levd.py --algorithm dqn --scenario full_deathmatch --train_levels 0 --train_maps 1 2 --test_levels 0 --test_maps 3 4 5 --seed 42 --epoch 20 --lr 0.0001 --step-per-collect 10 --batch-size 64
 
 Epoch #1: 100001it [04:09, 400.13it/s, env_step=100000, len=118, loss=0.136, n/ep=0, n/st=16, rew=2.66]                                                                       
 Epoch #1: test_reward: 3.439600 ± 1.981931, best_reward: 3.439600 ± 1.981931 in #1

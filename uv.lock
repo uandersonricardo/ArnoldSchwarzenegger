@@ -37,7 +37,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "gymnasium", specifier = ">=1.2.1" },
-    { name = "levdoom", editable = "LevDoom" },
+    { name = "levdoom", editable = "libs/LevDoom" },
     { name = "matplotlib", specifier = ">=3.10.7" },
     { name = "opencv-python", specifier = ">=4.12.0.88" },
     { name = "segment-tree", specifier = ">=0.3.2" },
@@ -388,7 +388,7 @@ wheels = [
 [[package]]
 name = "levdoom"
 version = "1.0.3"
-source = { editable = "LevDoom" }
+source = { editable = "libs/LevDoom" }
 dependencies = [
     { name = "gymnasium" },
     { name = "opencv-python" },
