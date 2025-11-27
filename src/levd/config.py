@@ -6,12 +6,14 @@ import torch
 from src.levd.algorithm.dqn import DQNImpl
 from src.levd.algorithm.ppo import PPOImpl
 from src.levd.algorithm.rainbow import RainbowImpl
+from src.levd.algorithm.drqn import DRQNImpl
 
 
 class Algorithm(Enum):
     DQN = DQNImpl
     PPO = PPOImpl
     RAINBOW = RainbowImpl
+    DRQN = DRQNImpl
 
 
 def parse_args() -> argparse.Namespace:
@@ -20,7 +22,7 @@ def parse_args() -> argparse.Namespace:
     # Core
     parser.add_argument('--scenario_name', type=str, default=None, required=True,
                         choices=['defend_the_center', 'health_gathering', 'seek_and_slay', 'dodge_projectiles', 'full_deathmatch'])
-    parser.add_argument('--algorithm', type=str, default=None, required=True, choices=['dqn', 'ppo', 'rainbow'])
+    parser.add_argument('--algorithm', type=str, default=None, required=True, choices=['dqn', 'ppo', 'rainbow', 'drqn'])
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--logdir', type=str, default='log')
     parser.add_argument('--watch', default=False, action='store_true', help='watch the play of pre-trained policy')
@@ -33,8 +35,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--render_sleep', type=float, default=0.02)
     parser.add_argument('--variable_queue_len', type=int, default=5)
     parser.add_argument('--normalize', type=bool, default=True)
-    parser.add_argument('--frame-height', type=int, default=84)
-    parser.add_argument('--frame-width', type=int, default=84)
+    parser.add_argument('--frame-height', type=int, default=60)
+    parser.add_argument('--frame-width', type=int, default=108)
     parser.add_argument('--frame-stack', type=int, default=4)
     parser.add_argument('--frame-skip', type=int, default=4)
     parser.add_argument('--resolution', type=str, default=None, choices=['800X600', '640X480', '320X240', '160X120'])
@@ -63,14 +65,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--test_maps', type=int, nargs='*', default=[2])
 
     # RL
-    parser.add_argument('--lr', type=float, default=2e-5)
+    parser.add_argument('--lr', type=float, default=1e-4)
     parser.add_argument('--lr-decay', type=int, default=True)
     parser.add_argument('--alpha', type=float, default=0.6)
     parser.add_argument('--beta', type=float, default=0.4)
     parser.add_argument('--gamma', type=float, default=0.99)
-    parser.add_argument('--target-update-freq', type=int, default=500)
+    parser.add_argument('--target-update-freq', type=int, default=200)
     parser.add_argument('--eps-train', type=float, default=1.)
-    parser.add_argument('--eps-train-final', type=float, default=0.05)
+    parser.add_argument('--eps-train-final', type=float, default=0.1)
 
     # Rainbow
     parser.add_argument('--num-atoms', type=int, default=51)

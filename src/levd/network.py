@@ -38,8 +38,7 @@ class DQN(nn.Module):
         if not features_only:
             self.net = nn.Sequential(
                 self.net,
-                nn.Linear(self.output_dim, 512), nn.ReLU(inplace=True),
-                nn.Linear(512, np.prod(action_shape))
+                nn.Linear(self.output_dim, np.prod(action_shape))
             )
             self.output_dim = np.prod(action_shape)
         elif output_dim is not None:
@@ -146,10 +145,75 @@ class Rainbow(DQN):
         return probs, state
 
 
+class DRQN(DQN):
+    """Deep Recurrent Q-Network.
+    For advanced usage (how to customize the network), please refer to
+    :ref:`build_the_network`.
+    """
+
+    def __init__(
+        self,
+        state_shape: Box,
+        action_shape: Discrete,
+        device: Union[str, int, torch.device] = "cpu",
+        hidden_size: int = None,
+        num_layers: int = 1,
+    ) -> None:
+        super().__init__(state_shape, action_shape, device, features_only=True)
+
+        self.rnn = nn.LSTM(
+            input_size=self.output_dim,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            dropout=0.0,
+            batch_first=True,
+        )
+        self.head = nn.Linear(hidden_size, np.prod(action_shape))
+        self.output_dim = np.prod(action_shape)
+        self.h_n = None
+        self.c_n = None
+
+    def forward(
+        self,
+        obs: Union[np.ndarray, torch.Tensor],
+        state: Optional[Any] = None,
+        info: Dict[str, Any] = {}
+    ) -> Tuple[torch.Tensor, Any]:
+        r"""Mapping: s -> Q(s, \*)."""
+        features, _ = super().forward(obs)
+
+        features = features.unsqueeze(1)
+        batch_size, seq_len, feat_dim = features.shape
+
+        if self.h_n is None or self.h_n.size(1) != batch_size:
+            h_n = torch.zeros(self.rnn.num_layers, batch_size, self.rnn.hidden_size, device=self.device)
+        else:
+            h_n = self.h_n
+
+        if self.c_n is None or self.c_n.size(1) != batch_size:
+            c_n = torch.zeros(self.rnn.num_layers, batch_size, self.rnn.hidden_size, device=self.device)
+        else:
+            c_n = self.c_n
+
+        out, (h_n, c_n) = self.rnn(features, (h_n, c_n))
+
+        self.h_n = h_n
+        self.c_n = c_n
+
+        q = self.head(out.contiguous().view(batch_size * seq_len, -1))
+        
+        return q, state, (0, 0)
+
+
 def build_conv_head(in_channels: int):
-    layers = []
-    for out_channels, kernel, stride in zip((32, 64, 64), (8, 4, 3), (4, 2, 1)):
-        layers.append(nn.Conv2d(in_channels, out_channels, kernel, stride))
-        layers.append(nn.ReLU())
-        in_channels = out_channels
+    layers = [
+        nn.Conv2d(in_channels=in_channels, out_channels=32, kernel_size=(8, 8), stride=(4, 4)),
+        nn.ReLU(),
+        nn.BatchNorm2d(32),
+        nn.Conv2d(in_channels=32, out_channels=64, kernel_size=(4, 4), stride=(2, 2)),
+        nn.ReLU(),
+        nn.BatchNorm2d(64),
+        nn.Dropout(p=0.0),
+    ]
+
     return nn.Sequential(*layers)

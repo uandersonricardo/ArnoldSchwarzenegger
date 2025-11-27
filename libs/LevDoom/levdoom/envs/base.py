@@ -38,7 +38,6 @@ class DoomEnv(gymnasium.Env):
         self.game.load_config(f"{scenario_dir}/conf.cfg")
         self.game.set_doom_scenario_path(f"{scenario_dir}/maps/{env}.wad")
         self.game.set_seed(seed)
-        # self.game.set_doom_map(f'map{map_id:02d}')
         self.render_enabled = render
 
         if max_steps:
