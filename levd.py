@@ -15,7 +15,7 @@ from tianshou.utils.logger.wandb import WandbLogger
 
 from src.levd.config import parse_args, Algorithm
 
-def train(args: Namespace):
+def run(args: Namespace):
     args.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     base_dir = pathlib.Path(__file__).parent.parent.resolve()
     experiment_dir = pathlib.Path(__file__).parent.resolve()
@@ -56,55 +56,89 @@ def train(args: Namespace):
     print("Observations shape:", args.state_shape)  # should be N_FRAMES x H x W
     print("Actions shape:", args.action_shape)
 
-    # Create training and testing environments
-    train_envs = create_vec_env(scenario, args.train_levels, args.train_maps, **kwargs)
-    test_envs = create_vec_env(scenario, args.test_levels, args.test_maps, **kwargs)
+    if args.watch:
+        # Create training and testing environments
+        test_envs = create_vec_env(scenario, args.test_levels, args.test_maps, **kwargs)
 
-    # Apply the seed
-    np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
-    train_envs.seed(args.seed)
-    test_envs.seed(args.seed)
+        # Apply the seed
+        np.random.seed(args.seed)
+        torch.manual_seed(args.seed)
+        test_envs.seed(args.seed)
 
-    # Initialize the algorithm
-    algorithm = algorithm_class(args, log_path)
+        # Initialize the algorithm
+        algorithm = algorithm_class(args, log_path)
 
-    policy = algorithm.get_policy()
-    # Load a previous policy
-    if args.resume_path:
-        resume_path = f'{args.logdir}/{args.algorithm}/{scenario_name}/{args.resume_path}'
-        policy.load_state_dict(torch.load(resume_path, map_location=args.device))
-        print("Loaded agent from: ", resume_path)
+        policy = algorithm.get_policy()
 
-    # Create replay buffer
-    buffer = algorithm.create_buffer(len(train_envs))
+        # Load a previous policy
+        if args.resume_path:
+            resume_path = f'{args.logdir}/{args.algorithm}/{scenario_name}/{args.resume_path}'
+            policy.load_state_dict(torch.load(resume_path, map_location=args.device))
+            print("Loaded agent from: ", resume_path)
 
-    # Create collectors
-    train_collector = Collector(policy, train_envs, buffer, exploration_noise=True)
-    test_collector = Collector(policy, test_envs)
+        print("Setup test envs...")
 
-    # Initialize logging
-    writer = SummaryWriter(log_path)
-    writer.add_text("args", str(args))
+        policy.eval()
 
-    wandb_id = f'{args.algorithm}_seed_{args.seed}_{args.timestamp}'
+        # Create collectors
+        test_collector = Collector(policy, test_envs)
+        test_collector.reset()
 
-    logger = TensorboardLogger(writer) if not args.with_wandb else WandbLogger(project=args.wandb_project,
-                                                                               name=wandb_id,
-                                                                               entity=args.wandb_user,
-                                                                               run_id=wandb_id,
-                                                                               config=args)
+        result = test_collector.collect(n_episode=args.test_num, render=args.render_sleep)
 
-    if args.with_wandb:
-        logger.load(writer)
+        # Display the final results
+        pprint.pprint(result)
+    else:
+        # Create training and testing environments
+        train_envs = create_vec_env(scenario, args.train_levels, args.train_maps, **kwargs)
+        test_envs = create_vec_env(scenario, args.test_levels, args.test_maps, **kwargs)
 
-    train_collector.collect(n_step=args.batch_size * args.training_num)
+        # Apply the seed
+        np.random.seed(args.seed)
+        torch.manual_seed(args.seed)
+        train_envs.seed(args.seed)
+        test_envs.seed(args.seed)
 
-    # Initialize trainer
-    result = algorithm.create_trainer(train_collector, test_collector, logger)
+        # Initialize the algorithm
+        algorithm = algorithm_class(args, log_path)
 
-    # Display the final results
-    pprint.pprint(result)
+        policy = algorithm.get_policy()
+
+        # Load a previous policy
+        if args.resume_path:
+            resume_path = f'{args.logdir}/{args.algorithm}/{scenario_name}/{args.resume_path}'
+            policy.load_state_dict(torch.load(resume_path, map_location=args.device))
+            print("Loaded agent from: ", resume_path)
+
+        # Create replay buffer
+        buffer = algorithm.create_buffer(len(train_envs))
+
+        # Create collectors
+        train_collector = Collector(policy, train_envs, buffer, exploration_noise=True)
+        test_collector = Collector(policy, test_envs)
+
+        # Initialize logging
+        writer = SummaryWriter(log_path)
+        writer.add_text("args", str(args))
+
+        wandb_id = f'{args.algorithm}_seed_{args.seed}_{args.timestamp}'
+
+        logger = TensorboardLogger(writer) if not args.with_wandb else WandbLogger(project=args.wandb_project,
+                                                                                name=wandb_id,
+                                                                                entity=args.wandb_user,
+                                                                                run_id=wandb_id,
+                                                                                config=args)
+
+        if args.with_wandb:
+            logger.load(writer)
+
+        train_collector.collect(n_step=args.batch_size * args.training_num)
+
+        # Initialize trainer
+        result = algorithm.create_trainer(train_collector, test_collector, logger)
+
+        # Display the final results
+        pprint.pprint(result)
 
 
 def create_vec_env(scenario, levels, maps, **kwargs):
@@ -117,4 +151,4 @@ def create_vec_env(scenario, levels, maps, **kwargs):
 
 
 if __name__ == '__main__':
-    train(parse_args())
+    run(parse_args())
