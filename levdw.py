@@ -27,16 +27,7 @@ def test(args: Namespace):
     scenario_name = args.scenario_name
     log_path = f'{args.logdir}/{args.algorithm}/{scenario_name}/{args.seed}_{args.timestamp}'
 
-    # Determine the scenario and algorithm
-    scenario = Scenario[scenario_name.upper()]
-    algorithm_class = Algorithm[args.algorithm.upper()].value
-
-    dummy_env = levdoom.make_level(scenario, 0)[0]
-    args.state_shape = dummy_env.observation_space.shape
-    args.action_shape = dummy_env.action_space.n
-    print("Observations shape:", args.state_shape)  # should be N_FRAMES x H x W
-    print("Actions shape:", args.action_shape)
-
+    # Build kwargs
     doom_kwargs = {
         'frame_skip': args.frame_skip,
         'seed': args.seed,
@@ -56,6 +47,16 @@ def test(args: Namespace):
         'doom': doom_kwargs,
         'wrap': wrapper_kwargs,
     }
+
+    # Determine the scenario and algorithm
+    scenario = Scenario[scenario_name.upper()]
+    algorithm_class = Algorithm[args.algorithm.upper()].value
+
+    dummy_env = levdoom.make_level(scenario, 0, **kwargs)[0]
+    args.state_shape = dummy_env.observation_space.shape
+    args.action_shape = dummy_env.action_space.n
+    print("Observations shape:", args.state_shape)  # should be N_FRAMES x H x W
+    print("Actions shape:", args.action_shape)
 
     # Create training and testing environments
     # train_envs = create_vec_env(scenario, args.train_levels, **kwargs)
