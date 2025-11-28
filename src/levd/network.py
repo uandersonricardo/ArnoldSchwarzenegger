@@ -202,7 +202,7 @@ class DRQN(DQN):
 
         q = self.head(out.contiguous().view(batch_size * seq_len, -1))
         
-        return q, state, (0, 0)
+        return q, state
 
 
 def build_conv_head(in_channels: int):
