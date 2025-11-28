@@ -21,7 +21,7 @@ class FullDeathmatch(DoomEnv):
     def __init__(self,
                  env: str,
                  base_reward: float = 0.0,
-                 distance_reward: float = 0.0,
+                 distance_reward: float = 0.001,
                  kill_reward: float = 5.0,
                  death_reward: float = -5.0,
                  suicide_reward: float = -5.0,
@@ -30,7 +30,7 @@ class FullDeathmatch(DoomEnv):
                  injured_reward: float = -1.0,
                  weapon_reward: float = 1.0,
                  ammo_reward: float = 1.0,
-                 use_ammo_reward: float = -0.2,
+                 use_ammo_reward: float = -0.01,
                  **kwargs):
         super().__init__(env, **kwargs)
         self.base_reward = base_reward
@@ -154,8 +154,8 @@ class FullDeathmatch(DoomEnv):
 
     def get_available_actions(self) -> List[List[float]]:
         actions = []
-        m_forward = [[0.0], [1.0]]
         t_left_right = [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0]]
+        m_forward = [[0.0], [1.0]]
         attack = [[0.0], [1.0]]
 
         for t in t_left_right:
