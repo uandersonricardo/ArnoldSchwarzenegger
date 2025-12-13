@@ -77,6 +77,36 @@ class GameVariableRewardWrapper(RewardWrapper):
         var_cur = vars_cur[self.var_index]
         var_prev = vars_prev[self.var_index]
 
+        # Found bullets reward
+        # WrapperHolder(GameVariableRewardWrapper, reward=self.ammo_reward, var_index=2),
+        # Found shells reward
+        # WrapperHolder(GameVariableRewardWrapper, reward=self.ammo_reward, var_index=9),
+        # Found rockets reward
+        # WrapperHolder(GameVariableRewardWrapper, reward=self.ammo_reward, var_index=10),
+        # Found cells reward
+        # WrapperHolder(GameVariableRewardWrapper, reward=self.ammo_reward, var_index=11),
+        # Used bullets reward
+        # WrapperHolder(GameVariableRewardWrapper, reward=self.use_ammo_reward * 2, var_index=2, decrease=True),
+        # Used shells reward
+        # WrapperHolder(GameVariableRewardWrapper, reward=self.use_ammo_reward * 1.5, var_index=9, decrease=True),
+        # Used rockets reward
+        # WrapperHolder(GameVariableRewardWrapper, reward=self.use_ammo_reward * 2, var_index=10, decrease=True),
+        # Used cells reward
+        # WrapperHolder(GameVariableRewardWrapper, reward=self.use_ammo_reward, var_index=11, decrease=True),
+        bullet = 2
+        shell = 9
+        rocket = 10
+        cell = 11        
+        kill = 1
+        used_ammo_reward = (self.var_index == bullet or self.var_index == shell or self.var_index == rocket or self.var_index == cell) and self.decrease
+        if used_ammo_reward: 
+            # Check if an enemy was killed. If so, do not give a penalty for using ammo.
+            # Otherwise, the agent might learn to avoid using ammo to avoid the penalty.            
+            killed_enemy = vars_cur[kill] > vars_prev[kill]  
+            if killed_enemy:
+                return reward                   
+
+        # Apply the reward or penalty based on the change in the game variable
         if not self.decrease and var_cur > var_prev or self.decrease and var_cur < var_prev:
             reward += self.rew
         return reward

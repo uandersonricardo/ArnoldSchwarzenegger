@@ -46,6 +46,7 @@ class DoomEnv(gymnasium.Env):
             # Use a higher resolution for rendering gameplay
             self.game.set_screen_resolution(ScreenResolution.RES_400X225)
             self.frame_skip = 1
+            # pass
         elif resolution:  # Use a particular predefined resolution
             self.game.set_screen_resolution(get_screen_resolution(resolution))
 
