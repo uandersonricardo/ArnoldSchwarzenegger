@@ -23,12 +23,18 @@ class DoomEnv(gymnasium.Env):
                  resolution: str = None,
                  max_steps: int = None,
                  variable_queue_length: int = 5,
-                 n_bots: int = 10):
+                 n_bots: int = 10,
+                 use_labels: bool = False,
+                 game_features: List[str] = None):
         super().__init__()
         self.env = env
         self.frame_skip = frame_skip
         self.scenario = self.__module__.split('.')[-2]
         self.n_bots = n_bots
+        
+        # Game features configuration
+        self.use_labels = use_labels
+        self.game_features = game_features or []
 
         # Determine the directory of the doom scenario
         scenario_dir = f'{Path(__file__).parent.resolve()}/{self.scenario}'
@@ -43,10 +49,10 @@ class DoomEnv(gymnasium.Env):
         if max_steps:
             self.game.set_episode_timeout(max_steps)
         if render:
-            # Use a higher resolution for rendering gameplay
-            self.game.set_screen_resolution(ScreenResolution.RES_400X225)
-            self.frame_skip = 1
-            # pass
+            # # Use a higher resolution for rendering gameplay
+            # self.game.set_screen_resolution(ScreenResolution.RES_400X225)
+            # self.frame_skip = 1
+            pass
         elif resolution:  # Use a particular predefined resolution
             self.game.set_screen_resolution(get_screen_resolution(resolution))
 
@@ -55,6 +61,10 @@ class DoomEnv(gymnasium.Env):
             "+sv_forcerespawn 1 +sv_noautoaim 1 +sv_respawnprotect 1 +sv_spawnfarthest 1 +sv_nocrouch 1 "
             " +name AI +colorset 0 "
         )
+        
+        # Enable labels buffer for game features
+        if self.use_labels or self.game_features:
+            self.game.set_labels_buffer_enabled(True)
 
         self.game.init()
         
@@ -162,6 +172,10 @@ class DoomEnv(gymnasium.Env):
         observation = np.transpose(state.screen_buffer, [1, 2, 0]) if state else np.zeros(self.game_res, dtype=self.obs_dtype)
         if not done:
             self.game_variable_buffer.append(state.game_variables)
+        
+        # Extract game features
+        if self.game_features and state:
+            info['game_features'] = self._extract_game_features(state)
 
         self.store_statistics(self.game_variable_buffer)
         return observation, reward, done, truncated, info
@@ -245,3 +259,60 @@ class DoomEnv(gymnasium.Env):
 
         for _ in range(10):
             self.game.send_game_command("addbot")
+    
+    def _extract_game_features(self, state) -> Optional[np.ndarray]:
+        """
+        Extract game features from labels buffer.
+        Returns a binary vector indicating presence of each feature type.
+        """
+        if not self.game_features or not state.labels_buffer is None:
+            return None
+        
+        try:
+            labels = state.labels
+            if not labels:
+                return np.zeros(len(self.game_features), dtype=np.float32)
+            
+            # Define object sets (similar to Arnold's labels.py)
+            ENEMY_SET = {
+                'MarineBFG', 'MarineBerserk', 'MarineChaingun', 'MarineChainsaw',
+                'MarineFist', 'MarinePistol', 'MarinePlasma', 'MarineRailgun',
+                'MarineRocket', 'MarineSSG', 'MarineShotgun', 'Demon',
+                'Zombieman', 'ShotgunGuy', 'ChaingunGuy', 'Imp', 'Cacodemon',
+                'HellKnight', 'BaronOfHell', 'Archvile', 'Revenant', 'Mancubus',
+                'Arachnotron', 'PainElemental', 'Fatso'
+            }
+            HEALTH_SET = {
+                'ArmorBonus', 'BlueArmor', 'GreenArmor', 'HealthBonus',
+                'Medikit', 'Stimpack', 'Soulsphere', 'Megasphere'
+            }
+            WEAPON_SET = {
+                'Pistol', 'Chaingun', 'RocketLauncher', 'Shotgun', 'SuperShotgun',
+                'PlasmaRifle', 'BFG9000', 'Chainsaw'
+            }
+            AMMO_SET = {
+                'Cell', 'CellPack', 'Clip', 'ClipBox', 'RocketAmmo', 'RocketBox',
+                'Shell', 'ShellBox', 'Backpack'
+            }
+            
+            feature_sets = {
+                'enemy': ENEMY_SET,
+                'health': HEALTH_SET,
+                'weapon': WEAPON_SET,
+                'ammo': AMMO_SET
+            }
+            
+            # Check if any object of each type is visible
+            features = []
+            for feature_name in self.game_features:
+                if feature_name in feature_sets:
+                    visible = any(label.object_name in feature_sets[feature_name] 
+                                 for label in labels)
+                    features.append(float(visible))
+                else:
+                    features.append(0.0)
+            
+            return np.array(features, dtype=np.float32) if features else None
+        except Exception as e:
+            # Return zeros on error to avoid breaking training
+            return np.zeros(len(self.game_features), dtype=np.float32)

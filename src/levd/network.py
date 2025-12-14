@@ -105,10 +105,13 @@ class Rainbow(DQN):
         device: Union[str, int, torch.device] = "cpu",
         is_dueling: bool = True,
         is_noisy: bool = True,
+        n_features: int = 0,
+        hidden_dim: int = 512,
     ) -> None:
         super().__init__(state_shape, action_shape, device, features_only=True)
         self.action_num = np.prod(action_shape)
         self.num_atoms = num_atoms
+        self.n_features = n_features
 
         def linear(x, y):
             return NoisyLinear(x, y, noisy_std) if is_noisy else nn.Linear(x, y)
@@ -123,6 +126,18 @@ class Rainbow(DQN):
                 linear(self.output_dim, 512), nn.ReLU(inplace=True),
                 linear(512, self.num_atoms)
             )
+        
+        # Game features prediction branch (auxiliary task)
+        if self.n_features > 0:
+            self.proj_game_features = nn.Sequential(
+                nn.Dropout(0.5),
+                nn.Linear(self.output_dim, hidden_dim),
+                nn.ReLU(),
+                nn.Dropout(0.5),
+                nn.Linear(hidden_dim, self.n_features),
+                nn.Sigmoid()  # Binary predictions
+            )
+        
         self.output_dim = self.action_num * self.num_atoms
 
     def forward(
@@ -142,6 +157,12 @@ class Rainbow(DQN):
         else:
             logits = q
         probs = logits.softmax(dim=2)
+        
+        # Game features prediction
+        if self.n_features > 0:
+            features = self.proj_game_features(obs)
+            return (probs, features), state
+        
         return probs, state
 
 

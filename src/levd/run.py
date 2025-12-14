@@ -36,6 +36,15 @@ def train(args: Namespace):
     args.action_shape = dummy_env.action_space.n
     print("Observations shape:", args.state_shape)  # should be N_FRAMES x H x W
     print("Actions shape:", args.action_shape)
+    
+    # Parse game features
+    game_features = []
+    if hasattr(args, 'use_game_features') and args.use_game_features:
+        game_features = [f.strip() for f in args.game_features.split(',') if f.strip()]
+    args.n_features = len(game_features)
+    
+    if args.n_features > 0:
+        print(f"Game features enabled: {game_features}")
 
     doom_kwargs = {
         'frame_skip': args.frame_skip,
@@ -43,6 +52,8 @@ def train(args: Namespace):
         'render': args.render,
         'resolution': args.resolution,
         'variable_queue_length': args.variable_queue_len,
+        'use_labels': args.n_features > 0,
+        'game_features': game_features,
     }
 
     wrapper_kwargs = {

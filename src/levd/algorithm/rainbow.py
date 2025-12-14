@@ -24,11 +24,15 @@ class RainbowImpl(DQNImpl):
         )
 
     def init_network(self) -> Module:
+        # Check if game features are enabled
+        n_features = getattr(self.args, 'n_features', 0)
+        
         return Rainbow(
             self.args.state_shape,
             self.args.action_shape,
             self.args.num_atoms,
-            device=self.args.device
+            device=self.args.device,
+            n_features=n_features
         )
 
     def init_policy(self) -> BasePolicy:

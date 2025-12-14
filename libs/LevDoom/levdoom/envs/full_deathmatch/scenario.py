@@ -171,11 +171,11 @@ class FullDeathmatch(DoomEnv):
             # Distance reward
             WrapperHolder(MovementRewardWrapper, scaler=self.distance_reward),
             # Kill reward
-            WrapperHolder(GameVariableRewardWrapper, reward=self.kill_reward * 5, var_index=1),
+            WrapperHolder(GameVariableRewardWrapper, reward=self.kill_reward, var_index=1),
             # Death reward
-            WrapperHolder(GameVariableRewardWrapper, reward=self.death_reward * 10, var_index=8),
+            WrapperHolder(GameVariableRewardWrapper, reward=self.death_reward, var_index=8),
             # Suicide reward
-            WrapperHolder(GameVariableRewardWrapper, reward=self.suicide_reward * 20, var_index=5, decrease=True),
+            WrapperHolder(GameVariableRewardWrapper, reward=self.suicide_reward, var_index=5, decrease=True),
             # Found medikit reward
             WrapperHolder(GameVariableRewardWrapper, reward=self.medikit_reward, var_index=0),
             # Injured reward
@@ -203,11 +203,11 @@ class FullDeathmatch(DoomEnv):
             # Found cells reward
             WrapperHolder(GameVariableRewardWrapper, reward=self.ammo_reward, var_index=11),
             # Used bullets reward
-            WrapperHolder(GameVariableRewardWrapper, reward=self.use_ammo_reward * 2, var_index=2, decrease=True),
+            WrapperHolder(GameVariableRewardWrapper, reward=self.use_ammo_reward, var_index=2, decrease=True),
             # Used shells reward
-            WrapperHolder(GameVariableRewardWrapper, reward=self.use_ammo_reward * 1.5, var_index=9, decrease=True),
+            WrapperHolder(GameVariableRewardWrapper, reward=self.use_ammo_reward, var_index=9, decrease=True),
             # Used rockets reward
-            WrapperHolder(GameVariableRewardWrapper, reward=self.use_ammo_reward * 2, var_index=10, decrease=True),
+            WrapperHolder(GameVariableRewardWrapper, reward=self.use_ammo_reward, var_index=10, decrease=True),
             # Used cells reward
             WrapperHolder(GameVariableRewardWrapper, reward=self.use_ammo_reward, var_index=11, decrease=True),
         ]

@@ -109,4 +109,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--penalty_ammo_used', default=0.1, type=float, help='Negative reward for using ammo')
     parser.add_argument('--traversal_reward_scaler', default=1e-3, type=float,
                         help='Reward scaler for traversing the map')
+    
+    # Game features (auxiliary task)
+    parser.add_argument('--use-game-features', default=False, action='store_true',
+                        help='Enable game features prediction as auxiliary task')
+    parser.add_argument('--game-features', type=str, default='enemy,health',
+                        help='Comma-separated list of features: enemy,health,weapon,ammo')
+    parser.add_argument('--feature-loss-weight', type=float, default=0.1,
+                        help='Weight for auxiliary feature loss')
+    
     return parser.parse_args()
