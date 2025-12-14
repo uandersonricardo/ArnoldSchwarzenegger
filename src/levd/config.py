@@ -7,6 +7,9 @@ from src.levd.algorithm.dqn import DQNImpl
 from src.levd.algorithm.ppo import PPOImpl
 from src.levd.algorithm.rainbow import RainbowImpl
 from src.levd.algorithm.drqn import DRQNImpl
+from src.levd.algorithm.dueling_dqn import DuelingDQNImpl
+from src.levd.algorithm.c51 import C51Impl
+from src.levd.algorithm.dtqn import DTQNImpl
 
 
 class Algorithm(Enum):
@@ -14,6 +17,9 @@ class Algorithm(Enum):
     PPO = PPOImpl
     RAINBOW = RainbowImpl
     DRQN = DRQNImpl
+    DUELING_DQN = DuelingDQNImpl
+    C51 = C51Impl
+    DTQN = DTQNImpl
 
 
 def parse_args() -> argparse.Namespace:
@@ -21,8 +27,8 @@ def parse_args() -> argparse.Namespace:
 
     # Core
     parser.add_argument('--scenario_name', type=str, default=None, required=True,
-                        choices=['defend_the_center', 'health_gathering', 'seek_and_slay', 'dodge_projectiles', 'full_deathmatch'])
-    parser.add_argument('--algorithm', type=str, default=None, required=True, choices=['dqn', 'ppo', 'rainbow', 'drqn'])
+                        choices=['defend_the_center', 'health_gathering', 'seek_and_slay', 'dodge_projectiles', 'full_deathmatch', 'defend_the_line'])
+    parser.add_argument('--algorithm', type=str, default=None, required=True, choices=['dqn', 'ppo', 'rainbow', 'drqn', 'dueling_dqn', 'c51', 'dtqn'])
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--logdir', type=str, default='log')
     parser.add_argument('--watch', default=False, action='store_true', help='watch the play of pre-trained policy')
@@ -35,8 +41,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--render_sleep', type=float, default=0.02)
     parser.add_argument('--variable_queue_len', type=int, default=5)
     parser.add_argument('--normalize', type=bool, default=True)
-    parser.add_argument('--frame-height', type=int, default=60)
-    parser.add_argument('--frame-width', type=int, default=108)
+    parser.add_argument('--frame-height', type=int, default=84)
+    parser.add_argument('--frame-width', type=int, default=84)
     parser.add_argument('--frame-stack', type=int, default=4)
     parser.add_argument('--frame-skip', type=int, default=4)
     parser.add_argument('--resolution', type=str, default=None, choices=['800X600', '640X480', '320X240', '160X120'])
@@ -50,10 +56,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--step-per-collect', type=int, default=1000)
     parser.add_argument('--repeat-per-collect', type=int, default=4)
     parser.add_argument('--update-per-step', type=float, default=0.1)
-    parser.add_argument('--batch-size', type=int, default=256)
+    parser.add_argument('--batch-size', type=int, default=128)
     parser.add_argument('--hidden-size', type=int, default=512)
     parser.add_argument('--training-num', type=int, default=10)
-    parser.add_argument('--buffer-size', type=int, default=1e5)
+    parser.add_argument('--buffer-size', type=int, default=1e6)
     parser.add_argument('--save-buffer-name', type=str, default=None)
     parser.add_argument('--train_maps', type=int, nargs='*', default=[1])
 
@@ -70,7 +76,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--alpha', type=float, default=0.6)
     parser.add_argument('--beta', type=float, default=0.4)
     parser.add_argument('--gamma', type=float, default=0.99)
-    parser.add_argument('--target-update-freq', type=int, default=200)
+    parser.add_argument('--target-update-freq', type=int, default=1000)
     parser.add_argument('--eps-train', type=float, default=1.)
     parser.add_argument('--eps-train-final', type=float, default=0.1)
 
@@ -78,7 +84,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--num-atoms', type=int, default=51)
     parser.add_argument('--v-min', type=float, default=-10.)
     parser.add_argument('--v-max', type=float, default=10.)
-    parser.add_argument('--n-step', type=int, default=3)
+    parser.add_argument('--n-step', type=int, default=5)
 
     # PPO
     parser.add_argument('--vf-coef', type=float, default=0.5)

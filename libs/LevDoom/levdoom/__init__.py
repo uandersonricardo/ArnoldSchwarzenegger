@@ -129,8 +129,8 @@ def wrap_env(env: Env, map_id=1, **kwargs):
     env = ResizeObservation(env, shape=(kwargs.get('frame_height', 84), kwargs.get('frame_width', 84)))
     if kwargs.get('rescale_observation', True):
         env = RescaleObservation(env)
-    if kwargs.get('normalize_observation', True):
-        env = NormalizeObservation(env)
+    # if kwargs.get('normalize_observation', True):
+    #     env = NormalizeObservation(env)
     env = FrameStackObservation(env, kwargs.get('frame_stack', 4))
     env = RGBStack(env)
     return env

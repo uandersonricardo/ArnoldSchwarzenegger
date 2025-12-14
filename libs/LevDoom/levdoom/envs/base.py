@@ -2,6 +2,7 @@ import os
 from collections import deque
 from collections import deque
 from pathlib import Path
+import time
 from typing import Dict, Tuple, Any, List, Optional
 
 import cv2
@@ -44,20 +45,22 @@ class DoomEnv(gymnasium.Env):
             self.game.set_episode_timeout(max_steps)
         if render:
             # Use a higher resolution for rendering gameplay
-            self.game.set_screen_resolution(ScreenResolution.RES_400X225)
-            self.frame_skip = 1
+            # self.game.set_screen_resolution(ScreenResolution.RES_400X225)
+            # self.frame_skip = 1
+            pass
         elif resolution:  # Use a particular predefined resolution
             self.game.set_screen_resolution(get_screen_resolution(resolution))
 
         self.game.add_game_args(
-            "-host 1 -deathmatch +sv_cheats 1 "
+            "-host 1 +sv_cheats 1 "
             "+sv_forcerespawn 1 +sv_noautoaim 1 +sv_respawnprotect 1 +sv_spawnfarthest 1 +sv_nocrouch 1 "
             " +name AI +colorset 0 "
         )
+        self.game.set_labels_buffer_enabled(True)
 
         self.game.init()
         
-        self.update_bots()
+        # self.update_bots()
 
         # Define the observation space
         self.game_res = (self.game.get_screen_height(), self.game.get_screen_width(), 3)
@@ -126,7 +129,7 @@ class DoomEnv(gymnasium.Env):
             self.game.init()
             self.game.new_episode()
         
-        self.update_bots()
+        # self.update_bots()
 
         self.clear_episode_statistics()
         state = self.game.get_state().screen_buffer

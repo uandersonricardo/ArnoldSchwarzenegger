@@ -98,3 +98,23 @@ class MovementRewardWrapper(RewardWrapper):
         distance = self.unwrapped.distance_buffer[-1]
         reward += distance * self.scaler  # Increase the reward for movement linearly
         return reward
+
+class LabelRewardWrapper(RewardWrapper):
+    """
+    Reward the agent with a constant reward at each time step.
+    """
+
+    def __init__(self, env, enemy_reward: float, item_reward: float, none_reward: float):
+        super(LabelRewardWrapper, self).__init__(env)
+        self.enemy_reward = enemy_reward
+        self.item_reward = item_reward
+        self.none_reward = none_reward
+
+    def reward(self, reward: float) -> float:
+        if self.unwrapped.labels.sum() == 0:
+            return reward + self.none_reward
+
+        if self.unwrapped.labels[0] == 1:
+            return reward + self.enemy_reward
+   
+        return reward + self.item_reward

@@ -5,7 +5,7 @@ import numpy as np
 
 from levdoom.envs.base import DoomEnv
 from levdoom.utils.utils import distance_traversed
-from levdoom.utils.wrappers import WrapperHolder, GameVariableRewardWrapper, MovementRewardWrapper, ConstantRewardWrapper
+from levdoom.utils.wrappers import WrapperHolder, GameVariableRewardWrapper, MovementRewardWrapper, ConstantRewardWrapper, LabelRewardWrapper
 
 
 class FullDeathmatch(DoomEnv):
@@ -20,17 +20,21 @@ class FullDeathmatch(DoomEnv):
 
     def __init__(self,
                  env: str,
-                 base_reward: float = 0.0,
-                 distance_reward: float = 0.001,
+                 base_reward: float = 0,
+                 distance_reward: float = 0.0,
                  kill_reward: float = 5.0,
-                 death_reward: float = -5.0,
+                 death_reward: float = -3.0,
                  suicide_reward: float = -5.0,
-                 medikit_reward: float = 1.0,
-                 armor_reward: float = 1.0,
-                 injured_reward: float = -1.0,
-                 weapon_reward: float = 1.0,
-                 ammo_reward: float = 1.0,
-                 use_ammo_reward: float = -0.01,
+                 medikit_reward: float = 0.1,
+                 armor_reward: float = 0.1,
+                 hit_reward: float = 0.5,
+                 injured_reward: float = -0.1,
+                 weapon_reward: float = 0.15,
+                 ammo_reward: float = 0.05,
+                 use_ammo_reward: float = -0.001,
+                 label_enemy_reward: float = 0,
+                 label_item_reward: float = 0,
+                 label_none_reward: float = 0,
                  **kwargs):
         super().__init__(env, **kwargs)
         self.base_reward = base_reward
@@ -40,10 +44,14 @@ class FullDeathmatch(DoomEnv):
         self.suicide_reward = suicide_reward
         self.medikit_reward = medikit_reward
         self.armor_reward = armor_reward
+        self.hit_reward = hit_reward
         self.injured_reward = injured_reward
         self.weapon_reward = weapon_reward
         self.ammo_reward = ammo_reward
         self.use_ammo_reward = use_ammo_reward
+        self.label_enemy_reward = label_enemy_reward
+        self.label_item_reward = label_item_reward
+        self.label_none_reward = label_none_reward
 
         self.kills = 0
         self.deaths = 0
@@ -65,8 +73,10 @@ class FullDeathmatch(DoomEnv):
         self.distance_buffer = []
         self.ammo_used = 0
         self.ammo_found = 0
+        self.hits = 0
         self.hits_taken = 0
         self.frames_survived = 0
+        self.labels = np.array([0, 0, 0, 0])
 
     def store_statistics(self, game_var_buf: deque) -> None:
         '''
@@ -109,7 +119,7 @@ class FullDeathmatch(DoomEnv):
             self.kills += current_vars[1] - previous_vars[1]
 
         # Death
-        if current_vars[8] > previous_vars[8]:
+        if self.game.is_player_dead():
             self.deaths += 1
         
         # Suicide
@@ -152,16 +162,32 @@ class FullDeathmatch(DoomEnv):
            current_vars[10] > previous_vars[10] or current_vars[11] > previous_vars[11]:
             self.ammo_found += 1
 
-    def get_available_actions(self) -> List[List[float]]:
-        actions = []
-        t_left_right = [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0]]
-        m_forward = [[0.0], [1.0]]
-        attack = [[0.0], [1.0]]
+        # Hit an enemy
+        if current_vars[12] > previous_vars[12]:
+            self.hits += 1
+        
+        # Update current labels
+        self.labels = np.array([0, 0, 0, 0])
 
-        for t in t_left_right:
-            for m in m_forward:
-                for a in attack:
-                    actions.append(t + m + a)
+        game_state = self.game.get_state()
+        if game_state is not None:
+            labels = game_state.labels
+            for label in labels:
+                type_id = self.get_label_type_id(label)
+                if type_id is not None:
+                    self.labels[type_id] = 1
+
+    def get_available_actions(self) -> List[List[float]]:
+        # actions = []
+        # t_left_right = [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0]]
+        # m_forward = [[0.0], [1.0]]
+        # attack = [[0.0], [1.0]]
+
+        # for t in t_left_right:
+        #     for m in m_forward:
+        #         for a in attack:
+        #             actions.append(t + m + a)
+        actions  = np.identity(4, dtype=int).tolist()
         return actions
 
     def reward_wrappers_easy(self) -> List[WrapperHolder]:
@@ -210,6 +236,10 @@ class FullDeathmatch(DoomEnv):
             WrapperHolder(GameVariableRewardWrapper, reward=self.use_ammo_reward, var_index=10, decrease=True),
             # Used cells reward
             WrapperHolder(GameVariableRewardWrapper, reward=self.use_ammo_reward, var_index=11, decrease=True),
+            # Hit enemy reward
+            WrapperHolder(GameVariableRewardWrapper, reward=self.hit_reward, var_index=12),
+            # Enemy on screen reward
+            WrapperHolder(LabelRewardWrapper, enemy_reward=self.label_enemy_reward, item_reward=self.label_item_reward, none_reward=self.label_none_reward)
         ]
 
     def reward_wrappers_hard(self) -> List[WrapperHolder]:
@@ -241,14 +271,23 @@ class FullDeathmatch(DoomEnv):
             'cells': self.cells,
             'frames_survived': self.frames_survived,
             'movement': np.mean(self.distance_buffer).round(3),
-            'hits_taken': self.hits_taken
+            'hits': self.hits,
+            'hits_taken': self.hits_taken,
+            'ammo_used': self.ammo_used,
+            'ammo_found': self.ammo_found,
+            'labels': self.labels
         }
 
     def clear_episode_statistics(self):
+        if False:
+            self.evaluate_episode()
+
         super().clear_episode_statistics()
+
         self.distance_buffer.clear()
         self.ammo_used = 0
         self.ammo_found = 0
+        self.hits = 0
         self.hits_taken = 0
         self.frames_survived = 0
         self.kills = 0
@@ -267,6 +306,69 @@ class FullDeathmatch(DoomEnv):
         self.shells = 0
         self.rockets = 0
         self.cells = 0
+        self.labels = np.array([0, 0, 0, 0])
     
     def print_state(self, vars: List[float]) -> None:
         print(f' Health: {vars[0]} | Kills: {vars[1]} | Ammo: {vars[2]} | Position: ({vars[3]:.2f}, {vars[4]:.2f}) | Frags: {vars[5]} | Selected Weapon: {vars[6]} | Armor: {vars[7]} | Dead: {vars[8]} | Bullets: {vars[2]} | Shells: {vars[9]} | Rockets: {vars[10]} | Cells: {vars[11]}')
+
+    def get_label_type_id(self, label):
+        """
+        Map an object name to a feature map.
+        0 = enemy
+        1 = health item
+        2 = weapon
+        3 = ammo
+        None = anything else
+        """
+        ENEMY_NAME_SET = set([
+            'MarineBFG', 'MarineBerserk', 'MarineChaingun', 'MarineChainsaw',
+            'MarineFist', 'MarinePistol', 'MarinePlasma', 'MarineRailgun',
+            'MarineRocket', 'MarineSSG', 'MarineShotgun',
+            'Demon'
+        ])
+
+        HEALTH_ITEM_NAME_SET = set([
+            'ArmorBonus', 'BlueArmor', 'GreenArmor', 'HealthBonus',
+            'Medikit', 'Stimpack'
+        ])
+
+        WEAPON_NAME_SET = set([
+            'Pistol', 'Chaingun', 'RocketLauncher', 'Shotgun', 'SuperShotgun',
+            'PlasmaRifle', 'BFG9000', 'Chainsaw'
+        ])
+
+        AMMO_NAME_SET = set([
+            'Cell', 'CellPack', 'Clip', 'ClipBox', 'RocketAmmo', 'RocketBox',
+            'Shell', 'ShellBox'
+        ])
+
+        name = label.object_name
+        value = label.value
+        if value != 255 and name == 'DoomPlayer' or name in ENEMY_NAME_SET:
+            return 0
+        elif name in HEALTH_ITEM_NAME_SET:
+            return 1
+        elif name in WEAPON_NAME_SET:
+            return 2
+        elif name in AMMO_NAME_SET:
+            return 3
+        
+    evaluating = True
+    episode = 0
+    evaluations = (0, 0)
+    
+    def evaluate_episode(self) -> float:
+        if not self.game_variable_buffer or self.frames_survived == 0:
+            return
+        self.episode += 1
+        print(f"--- Episode {self.episode} statistics ---")
+        print("Frames survived:", self.frames_survived)
+        print("Kills:", self.game_variable_buffer[-1][0])
+        print("Deaths:", 1)
+        print("K/D Ratio:", self.game_variable_buffer[-1][0] / 1)
+        self.evaluations = (self.evaluations[0] + self.game_variable_buffer[-1][0], self.evaluations[1] + 1)
+        print(f"--- Total {self.episode} statistics ---")
+        print("Kills:", self.evaluations[0])
+        print("Deaths:", self.evaluations[1])
+        print("K/D Ratio:", self.evaluations[0] / self.evaluations[1])
+        print("")

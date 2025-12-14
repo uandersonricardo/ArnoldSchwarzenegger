@@ -28,7 +28,6 @@ class DQNModuleFeedforward(DQNModuleBase):
 
         assert x_screens.ndimension() == 4
         assert len(x_variables) == self.n_variables
-        print(x_variables)
         #assert all(x.ndimension() == 1 and x.size(0) == batch_size
         #           for x in x_variables)
 
