@@ -5,7 +5,7 @@ import numpy as np
 
 from levdoom.envs.base import DoomEnv
 from levdoom.utils.utils import distance_traversed
-from levdoom.utils.wrappers import WrapperHolder, GameVariableRewardWrapper, MovementRewardWrapper, ConstantRewardWrapper
+from levdoom.utils.wrappers import WrapperHolder, GameVariableRewardWrapper, MovementRewardWrapper, AdaptiveMovementRewardWrapper, ConstantRewardWrapper
 
 
 class FullDeathmatch(DoomEnv):
@@ -21,16 +21,25 @@ class FullDeathmatch(DoomEnv):
     def __init__(self,
                  env: str,
                  base_reward: float = 0.0,
-                 distance_reward: float = 0.001,
+                 distance_reward: float = 0.01,
                  kill_reward: float = 5.0,
                  death_reward: float = -5.0,
-                 suicide_reward: float = -5.0,
+                 suicide_reward: float = -20.0, # Suicide is way worse than being killed by a monster
                  medikit_reward: float = 1.0,
                  armor_reward: float = 1.0,
                  injured_reward: float = -1.0,
                  weapon_reward: float = 1.0,
                  ammo_reward: float = 1.0,
                  use_ammo_reward: float = -0.01,
+                 # Advanced exploration parameters
+                 novelty_reward: float = 0.5,
+                 revisit_penalty: float = -0.1,
+                 standing_still_penalty: float = -0.1,
+                 velocity_reward: float = 0.01,
+                 grid_size: float = 500.0,
+                 enable_novelty: bool = True,
+                 enable_velocity: bool = True,
+                 enable_diversity: bool = True,
                  **kwargs):
         super().__init__(env, **kwargs)
         self.base_reward = base_reward
@@ -44,6 +53,16 @@ class FullDeathmatch(DoomEnv):
         self.weapon_reward = weapon_reward
         self.ammo_reward = ammo_reward
         self.use_ammo_reward = use_ammo_reward
+        
+        # Advanced exploration parameters
+        self.novelty_reward = novelty_reward
+        self.revisit_penalty = revisit_penalty
+        self.standing_still_penalty = standing_still_penalty
+        self.velocity_reward = velocity_reward
+        self.grid_size = grid_size
+        self.enable_novelty = enable_novelty
+        self.enable_velocity = enable_velocity
+        self.enable_diversity = enable_diversity
 
         self.kills = 0
         self.deaths = 0
@@ -67,6 +86,15 @@ class FullDeathmatch(DoomEnv):
         self.ammo_found = 0
         self.hits_taken = 0
         self.frames_survived = 0
+        
+        # Advanced exploration tracking
+        self.position_grid = {}  # grid_cell -> visit_count
+        self.visited_positions = set()  # Fine-grained position tracking
+        self.total_novelty_reward = 0.0
+        self.total_revisit_penalty = 0.0
+        self.total_velocity_reward = 0.0
+        self.total_standing_penalty = 0.0
+        self.exploration_ratio = 0.0
 
     def store_statistics(self, game_var_buf: deque) -> None:
         '''
@@ -151,7 +179,77 @@ class FullDeathmatch(DoomEnv):
         elif current_vars[2] > previous_vars[2] or current_vars[9] > previous_vars[9] or \
            current_vars[10] > previous_vars[10] or current_vars[11] > previous_vars[11]:
             self.ammo_found += 1
+        
+        # Advanced exploration tracking
+        self._track_position_diversity(current_vars)
+        self._track_novelty(current_vars)
+        self._track_velocity(current_vars, previous_vars)
 
+    def _track_position_diversity(self, current_vars: List[float]) -> None:
+        """Track position diversity and penalize revisiting same areas."""
+        if not self.enable_diversity:
+            return
+        
+        current_x = current_vars[3]
+        current_y = current_vars[4]
+        
+        # Quantize position to grid cell
+        grid_key = (int(current_x // self.grid_size), 
+                    int(current_y // self.grid_size))
+        
+        # Track visit count
+        if grid_key not in self.position_grid:
+            self.position_grid[grid_key] = 0
+        
+        self.position_grid[grid_key] += 1
+        
+        # Apply penalty for frequently revisited cells (more than 5 visits)
+        if self.position_grid[grid_key] > 5:
+            penalty = self.revisit_penalty * (self.position_grid[grid_key] - 5)
+            self.total_revisit_penalty += penalty
+        
+        # Update exploration ratio
+        self.exploration_ratio = len(self.position_grid) / max(1, self.frames_survived / 100)
+    
+    def _track_novelty(self, current_vars: List[float]) -> None:
+        """Reward exploring new areas of the map (novelty-based exploration)."""
+        if not self.enable_novelty:
+            return
+        
+        current_x = current_vars[3]
+        current_y = current_vars[4]
+        
+        # Fine-grained position tracking (rounded to 1 decimal place)
+        pos_key = (round(current_x, 1), round(current_y, 1))
+        
+        # Reward for visiting new positions
+        if pos_key not in self.visited_positions:
+            self.visited_positions.add(pos_key)
+            self.total_novelty_reward += self.novelty_reward
+    
+    def _track_velocity(self, current_vars: List[float], previous_vars: List[float]) -> None:
+        """Reward continuous movement and penalize standing still."""
+        if not self.enable_velocity:
+            return
+        
+        curr_x, curr_y = current_vars[3], current_vars[4]
+        prev_x, prev_y = previous_vars[3], previous_vars[4]
+        
+        # Calculate step distance
+        step_distance = np.sqrt((curr_x - prev_x)**2 + (curr_y - prev_y)**2)
+        
+        # Reward movement
+        if step_distance > 1.0:  # Meaningful movement threshold
+            self.total_velocity_reward += self.velocity_reward * step_distance
+        elif step_distance < 0.1:  # Nearly standing still
+            self.total_standing_penalty += self.standing_still_penalty
+    
+    def get_adaptive_distance_reward(self) -> float:
+        """Get the current decay factor for distance rewards based on exploration."""
+        # Return the current decay factor (100% -> 20% as exploration increases)
+        decay_factor = max(0.2, 1.0 - min(0.8, self.exploration_ratio))
+        return decay_factor
+    
     def get_available_actions(self) -> List[List[float]]:
         actions = []
         t_left_right = [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0]]
@@ -168,8 +266,8 @@ class FullDeathmatch(DoomEnv):
         return [
             # Base reward
             WrapperHolder(ConstantRewardWrapper, reward=self.base_reward),
-            # Distance reward
-            WrapperHolder(MovementRewardWrapper, scaler=self.distance_reward),
+            # Adaptive distance reward (decays as exploration increases)
+            WrapperHolder(AdaptiveMovementRewardWrapper, base_scaler=self.distance_reward),
             # Kill reward
             WrapperHolder(GameVariableRewardWrapper, reward=self.kill_reward, var_index=1),
             # Death reward
@@ -240,8 +338,17 @@ class FullDeathmatch(DoomEnv):
             'rockets': self.rockets,
             'cells': self.cells,
             'frames_survived': self.frames_survived,
-            'movement': np.mean(self.distance_buffer).round(3),
-            'hits_taken': self.hits_taken
+            'movement': np.mean(self.distance_buffer).round(3) if self.distance_buffer else 0.0,
+            'hits_taken': self.hits_taken,
+            # Advanced exploration metrics
+            'unique_positions': len(self.visited_positions),
+            'grid_cells_visited': len(self.position_grid),
+            'novelty_reward': round(self.total_novelty_reward, 2),
+            'revisit_penalty': round(self.total_revisit_penalty, 2),
+            'velocity_reward': round(self.total_velocity_reward, 2),
+            'standing_penalty': round(self.total_standing_penalty, 2),
+            'exploration_ratio': round(self.exploration_ratio, 3),
+            'adaptive_distance_reward': round(self.get_adaptive_distance_reward(), 3)
         }
 
     def clear_episode_statistics(self):
@@ -267,6 +374,15 @@ class FullDeathmatch(DoomEnv):
         self.shells = 0
         self.rockets = 0
         self.cells = 0
+        
+        # Clear advanced exploration tracking
+        self.position_grid.clear()
+        self.visited_positions.clear()
+        self.total_novelty_reward = 0.0
+        self.total_revisit_penalty = 0.0
+        self.total_velocity_reward = 0.0
+        self.total_standing_penalty = 0.0
+        self.exploration_ratio = 0.0
     
     def print_state(self, vars: List[float]) -> None:
         print(f' Health: {vars[0]} | Kills: {vars[1]} | Ammo: {vars[2]} | Position: ({vars[3]:.2f}, {vars[4]:.2f}) | Frags: {vars[5]} | Selected Weapon: {vars[6]} | Armor: {vars[7]} | Dead: {vars[8]} | Bullets: {vars[2]} | Shells: {vars[9]} | Rockets: {vars[10]} | Cells: {vars[11]}')

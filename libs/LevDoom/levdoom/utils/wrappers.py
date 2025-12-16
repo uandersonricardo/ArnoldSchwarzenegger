@@ -128,3 +128,39 @@ class MovementRewardWrapper(RewardWrapper):
         distance = self.unwrapped.distance_buffer[-1]
         reward += distance * self.scaler  # Increase the reward for movement linearly
         return reward
+
+
+class AdaptiveMovementRewardWrapper(RewardWrapper):
+    """
+    Adaptive movement reward that decreases as the agent explores more of the map.
+    Prevents endless wandering by reducing distance rewards when exploration ratio is high.
+    """
+
+    def __init__(self, env, base_scaler: float):
+        super(AdaptiveMovementRewardWrapper, self).__init__(env)
+        self.base_scaler = base_scaler
+
+    def reward(self, reward):
+        if len(self.unwrapped.distance_buffer) < 2:
+            return reward
+        
+        distance = self.unwrapped.distance_buffer[-1]
+        base_reward = distance * self.base_scaler
+        
+        # Calculate exploration ratio (visited grid cells / potential cells)
+        # Assuming a typical map size, we use the number of visited cells as proxy
+        exploration_ratio = 0.0
+        if hasattr(self.unwrapped, 'position_grid') and len(self.unwrapped.position_grid) > 0:
+            # Estimate total cells based on typical map size (e.g., 100x100 grid)
+            total_cells = 10000  # 100x100 grid
+            visited_cells = len(self.unwrapped.position_grid)
+            exploration_ratio = min(visited_cells / total_cells, 1.0)
+            self.unwrapped.exploration_ratio = exploration_ratio
+        
+        # Apply decay: starts at 100%, decays to minimum 20% as exploration increases
+        decay_factor = max(0.2, 1.0 - min(0.8, exploration_ratio))
+        
+        adaptive_reward = base_reward * decay_factor
+        reward += adaptive_reward
+        
+        return reward

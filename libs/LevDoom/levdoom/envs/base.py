@@ -49,7 +49,7 @@ class DoomEnv(gymnasium.Env):
         if max_steps:
             self.game.set_episode_timeout(max_steps)
         if render:
-            # # Use a higher resolution for rendering gameplay
+            # Use a higher resolution for rendering gameplay
             # self.game.set_screen_resolution(ScreenResolution.RES_400X225)
             # self.frame_skip = 1
             pass
