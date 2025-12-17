@@ -136,20 +136,40 @@ class DefendTheCenter(DoomEnv):
         
     evaluating = True
     episode = 0
-    evaluations = (0, 0)
+    evaluations = []
+    MAX_EPISODES = 30
     
     def evaluate_episode(self) -> float:
-        if not self.game_variable_buffer or self.frames_survived == 0:
+        if not self.game_variable_buffer or self.frames_survived == 0 or self.episode > self.MAX_EPISODES:
             return
         self.episode += 1
-        print(f"--- Episode {self.episode} statistics ---")
-        print("Frames survived:", self.frames_survived)
-        print("Kills:", self.game_variable_buffer[-1][0])
-        print("Deaths:", 1)
-        print("K/D Ratio:", self.game_variable_buffer[-1][0] / 1)
-        self.evaluations = (self.evaluations[0] + self.game_variable_buffer[-1][0], self.evaluations[1] + 1)
-        print(f"--- Total {self.episode} statistics ---")
-        print("Kills:", self.evaluations[0])
-        print("Deaths:", self.evaluations[1])
-        print("K/D Ratio:", self.evaluations[0] / self.evaluations[1])
-        print("")
+        print(f"--- Episode {self.episode} statistics {self.env} ---")
+        # print("Frames survived:", self.frames_survived)
+        # print("Kills:", self.game_variable_buffer[-1][0])
+        # print("Deaths:", 1)
+        # print("K/D Ratio:", self.game_variable_buffer[-1][0] / 1)
+        self.evaluations.append((self.episode, self.frames_survived, self.game_variable_buffer[-1][0], 1))
+        # print(f"--- Total {self.episode} statistics ---")
+        # print("Kills:", self.evaluations[0])
+        # print("Deaths:", self.evaluations[1])
+        # print("K/D Ratio:", self.evaluations[0] / self.evaluations[1])
+        if self.episode == self.MAX_EPISODES:
+            print(f"=== EVALUATIONS {self.env} ===")
+            print(self.evaluations)
+            print("")
+            print("=== TABLE ===")
+            print("Total episodes:", self.episode)
+            total_frames = sum([e[1] for e in self.evaluations])
+            total_kills = sum([e[2] for e in self.evaluations])
+            total_deaths = sum([e[3] for e in self.evaluations])
+            print("Total frames survived:", total_frames)
+            print("Total kills:", total_kills)
+            print("Total deaths:", total_deaths)
+            print("K/D Ratio:", total_kills / total_deaths)
+            avg_frames = total_frames / self.episode
+            avg_kills = total_kills / self.episode
+            avg_deaths = total_deaths / self.episode
+            print("Average frames survived:", avg_frames)
+            print("Average kills:", avg_kills)
+            print("Average deaths:", avg_deaths)
+            print("Average K/D Ratio:", avg_kills / avg_deaths)

@@ -265,8 +265,8 @@ class DTQN(DQN):
             requires_grad=True
         )
         
-        # Transformer encoder
-        encoder_layer = nn.TransformerEncoderLayer(
+        # Decoder with causal masking - only sees past
+        decoder_layer = nn.TransformerDecoderLayer(
             d_model=hidden_size,
             nhead=num_heads,
             dim_feedforward=hidden_size * 4,
@@ -275,10 +275,14 @@ class DTQN(DQN):
             batch_first=True,
             norm_first=False
         )
-        self.transformer = nn.TransformerEncoder(
-            encoder_layer,
+
+        self.transformer = nn.TransformerDecoder(
+            decoder_layer,
             num_layers=num_layers
         )
+
+        # For decoder, we need a memory (can use zeros or learned)
+        self.memory = nn.Parameter(torch.zeros(1, 1, hidden_size))
         
         # Output head
         self.head = nn.Linear(hidden_size, np.prod(action_shape))
@@ -313,10 +317,20 @@ class DTQN(DQN):
         
         # Add positional encoding
         features = features + self.pos_encoding[:, :seq_len, :]
-        
-        # Apply transformer
-        # Note: Transformer expects (batch, seq, feature) with batch_first=True
-        transformer_out = self.transformer(features)
+
+
+        # Decoder requires causal mask and memory
+        causal_mask = nn.Transformer.generate_square_subsequent_mask(
+            seq_len, device=self.device
+        )
+
+        memory = self.memory.expand(batch_size, -1, -1)
+
+        transformer_out = self.transformer(
+            features, 
+            memory,
+            tgt_mask=causal_mask
+        )
         
         # Take the last output for Q-value prediction
         last_output = transformer_out[:, -1, :]
