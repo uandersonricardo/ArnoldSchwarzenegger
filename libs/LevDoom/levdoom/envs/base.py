@@ -1,4 +1,5 @@
 import os
+import time
 from collections import deque
 from collections import deque
 from pathlib import Path
@@ -234,6 +235,7 @@ class DoomEnv(gymnasium.Env):
                 # Render the image to the screen with swapped red and blue channels
                 cv2.imshow('DOOM', img[:, :, [2, 1, 0]])
                 cv2.waitKey(1)
+                # time.sleep(0.02)
             except Exception as e:
                 print(f'Screen rendering unsuccessful: {e}')
                 return np.zeros(img.shape)

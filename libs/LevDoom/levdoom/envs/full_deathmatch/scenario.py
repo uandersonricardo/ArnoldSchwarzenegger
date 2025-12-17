@@ -352,6 +352,9 @@ class FullDeathmatch(DoomEnv):
         }
 
     def clear_episode_statistics(self):
+        if True:
+            self.evaluate_episode()
+
         super().clear_episode_statistics()
         self.distance_buffer.clear()
         self.ammo_used = 0
@@ -386,3 +389,57 @@ class FullDeathmatch(DoomEnv):
     
     def print_state(self, vars: List[float]) -> None:
         print(f' Health: {vars[0]} | Kills: {vars[1]} | Ammo: {vars[2]} | Position: ({vars[3]:.2f}, {vars[4]:.2f}) | Frags: {vars[5]} | Selected Weapon: {vars[6]} | Armor: {vars[7]} | Dead: {vars[8]} | Bullets: {vars[2]} | Shells: {vars[9]} | Rockets: {vars[10]} | Cells: {vars[11]}')
+
+    evaluating = True
+    episode = 0
+    evaluations = []
+    MAX_EPISODES = 30
+
+    def evaluate_episode(self) -> float:
+        if not self.game_variable_buffer or self.frames_survived == 0 or self.episode > self.MAX_EPISODES:
+            return
+        self.episode += 1
+
+        print(f"--- Episode {self.episode} statistics {self.env} ---")
+        # print("Frames survived:", self.frames_survived)
+        # print("Kills:", self.game_variable_buffer[-1][1])
+        # print("Kills:", self.kills)
+        # print("Deaths:", self.deaths)
+        # print("Suicides:", self.suicides)
+        # print("Deaths:", 1)
+        # print("K/D Ratio:", self.game_variable_buffer[-1][0] / 1)
+        self.evaluations.append((self.episode, self.frames_survived, self.kills, 1, self.ammo_found + self.medikits + self.armors, self.pistol + self.shotgun + self.chaingun + self.rocket_launcher + self.plasma_rifle + self.bfg9000))
+        # print(f"--- Total {self.episode} statistics ---")
+        # print("Kills:", self.evaluations[0])
+        # print("Deaths:", self.evaluations[1])
+        # print("K/D Ratio:", self.evaluations[0] / self.evaluations[1])
+        if self.episode == self.MAX_EPISODES:
+            print(f"=== EVALUATIONS {self.env} ===")
+            print(self.evaluations)
+            print("")
+            print("=== TABLE ===")
+            print("Total episodes:", self.episode)
+            total_frames = sum([e[1] for e in self.evaluations])
+            total_kills = sum([e[2] for e in self.evaluations])
+            total_deaths = sum([e[3] for e in self.evaluations])
+            total_items = sum([e[4] for e in self.evaluations])
+            total_weapons = sum([e[5] for e in self.evaluations])
+            print("Total frames survived:", total_frames)
+            print("Total kills:", total_kills)
+            print("Total deaths:", total_deaths)
+            print("K/D Ratio:", total_kills / total_deaths)
+            print("Total items collected:", total_items)
+            print("Total weapons collected:", total_weapons)
+            print("")
+            avg_frames = total_frames / self.episode
+            avg_kills = total_kills / self.episode
+            avg_deaths = total_deaths / self.episode
+            avg_items = total_items / self.episode
+            avg_weapons = total_weapons / self.episode
+            print("Average frames survived:", avg_frames)
+            print("Average kills:", avg_kills)
+            print("Average deaths:", avg_deaths)
+            print("Average K/D Ratio:", avg_kills / avg_deaths)
+            print("Average items collected:", avg_items)
+            print("Average weapons collected:", avg_weapons)
+            
