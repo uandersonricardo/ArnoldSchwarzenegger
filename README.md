@@ -253,3 +253,122 @@ If you found this code useful, please consider citing:
 
 ## Acknowledgements
 We acknowledge the developers of [*ViZDoom*](http://vizdoom.cs.put.edu.pl/) for constant help and support during the development of this project. Some of the maps and wad files have been borrowed from the ViZDoom [*git repository*](https://github.com/mwydmuch/ViZDoom). We also thank the members of the [*ZDoom*](https://forum.zdoom.org/) community for their help with the Action Code Scripts (ACS).
+
+## Architectures
+
+### DQN
+
+Name: net, Module: Sequential(
+  (0): Sequential(
+    (0): Sequential(
+      (0): Conv2d(12, 32, kernel_size=(8, 8), stride=(4, 4))
+      (1): ReLU()
+      (2): Conv2d(32, 64, kernel_size=(4, 4), stride=(2, 2))
+      (3): ReLU()
+      (4): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1))
+      (5): ReLU()
+    )
+    (1): Flatten(start_dim=1, end_dim=-1)
+  )
+  (1): Linear(in_features=3136, out_features=512, bias=True)
+  (2): ReLU(inplace=True)
+  (3): Linear(in_features=512, out_features=6, bias=True)
+)
+
+### C51
+
+Name: net, Module: Sequential(
+  (0): Sequential(
+    (0): Sequential(
+      (0): Conv2d(12, 32, kernel_size=(8, 8), stride=(4, 4))
+      (1): ReLU()
+      (2): Conv2d(32, 64, kernel_size=(4, 4), stride=(2, 2))
+      (3): ReLU()
+      (4): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1))
+      (5): ReLU()
+    )
+    (1): Flatten(start_dim=1, end_dim=-1)
+  )
+  (1): Linear(in_features=3136, out_features=512, bias=True)
+  (2): ReLU(inplace=True)
+  (3): Linear(in_features=512, out_features=306, bias=True)
+)
+
+### Rainbow
+
+Name: net, Module: Sequential(
+  (0): Sequential(
+    (0): Conv2d(12, 32, kernel_size=(8, 8), stride=(4, 4))
+    (1): ReLU()
+    (2): Conv2d(32, 64, kernel_size=(4, 4), stride=(2, 2))
+    (3): ReLU()
+    (4): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1))
+    (5): ReLU()
+  )
+  (1): Flatten(start_dim=1, end_dim=-1)
+)
+
+Name: Q, Module: Sequential(
+  (0): NoisyLinear(in_features=3136, out_features=512, bias=True)
+  (1): ReLU(inplace=True)
+  (2): NoisyLinear(in_features=512, out_features=306, bias=True)
+)
+
+Name: V, Module: Sequential(
+  (0): NoisyLinear(in_features=3136, out_features=512, bias=True)
+  (1): ReLU(inplace=True)
+  (2): NoisyLinear(in_features=512, out_features=51, bias=True)
+)
+
+### DRQN
+
+Name: net, Module: Sequential(
+  (0): Sequential(
+    (0): Conv2d(3, 32, kernel_size=(8, 8), stride=(4, 4))
+    (1): ReLU()
+    (2): Conv2d(32, 64, kernel_size=(4, 4), stride=(2, 2))
+    (3): ReLU()
+    (4): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1))
+    (5): ReLU()
+  )
+  (1): Flatten(start_dim=1, end_dim=-1)
+)
+
+Name: rnn, Module: LSTM(3136, 512, batch_first=True)
+
+Name: head, Module: Linear(in_features=512, out_features=6, bias=True)
+
+### DTQN
+
+Name: net, Module: Sequential(
+  (0): Sequential(
+    (0): Conv2d(12, 32, kernel_size=(8, 8), stride=(4, 4))
+    (1): ReLU()
+    (2): Conv2d(32, 64, kernel_size=(4, 4), stride=(2, 2))
+    (3): ReLU()
+    (4): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1))
+    (5): ReLU()
+  )
+  (1): Flatten(start_dim=1, end_dim=-1)
+)
+
+Name: feature_proj, Module: Linear(in_features=3136, out_features=512, bias=True)
+
+Name: transformer, Module: TransformerEncoder(
+  (layers): ModuleList(
+    (0-2): 3 x TransformerEncoderLayer(
+      (self_attn): MultiheadAttention(
+        (out_proj): NonDynamicallyQuantizableLinear(in_features=512, out_features=512, bias=True)
+      )
+      (linear1): Linear(in_features=512, out_features=2048, bias=True)
+      (dropout): Dropout(p=0.1, inplace=False)
+      (linear2): Linear(in_features=2048, out_features=512, bias=True)
+      (norm1): LayerNorm((512,), eps=1e-05, elementwise_affine=True)
+      (norm2): LayerNorm((512,), eps=1e-05, elementwise_affine=True)
+      (dropout1): Dropout(p=0.1, inplace=False)
+      (dropout2): Dropout(p=0.1, inplace=False)
+    )
+  )
+)
+
+Name: head, Module: Linear(in_features=512, out_features=6, bias=True)

@@ -26,19 +26,6 @@ class DQN(nn.Module):
         super().__init__()
         self.device = device
         self.conv_head = build_conv_head(state_shape[0])
-
-        # tf_model = BaseConvNet(
-        #     state_shape=state_shape,
-        #     labels_shape=4,
-        #     device=device,
-        # )
-
-        # CHECKPOINT_DIR = Path("tf_checkpoints")
-        # checkpoint = torch.load(CHECKPOINT_DIR / "best_map01_checkpoint.pth", map_location=device)
-        # tf_model.load_state_dict(checkpoint['model_state_dict'])
-        # print(tf_model.conv_head)
-        # self.conv_head = tf_model.conv_head
-
         self.flatten = nn.Flatten()
         self.net = nn.Sequential(
             self.conv_head,
@@ -175,7 +162,12 @@ class DRQN(DQN):
         hidden_size: int = None,
         num_layers: int = 1,
     ) -> None:
-        super().__init__(state_shape, action_shape, device, features_only=True)
+        n_channels, height, width = state_shape
+        channels = 3  # RGB
+        n_stack = n_channels // channels
+        temp_state_shape = (state_shape[0] // n_stack, state_shape[1], state_shape[2])
+
+        super().__init__(temp_state_shape, action_shape, device, features_only=True)
 
         self.rnn = nn.LSTM(
             input_size=self.output_dim,
@@ -194,9 +186,23 @@ class DRQN(DQN):
         info: Dict[str, Any] = {}
     ) -> Tuple[torch.Tensor, Any]:
         r"""Mapping: s -> Q(s, \*)."""
-        features, _ = super().forward(obs)
+        # Reshape obs from (batch_size, n_channels, height, width)
+        # to (batch_size * n_stack, channels, height, width)
+        batch_size, n_channels, height, width = obs.shape
+        channels = 3  # RGB
+        n_stack = n_channels // channels
+        obs = obs.reshape(batch_size, n_stack, channels, height, width)
 
-        features = features.unsqueeze(1)
+        # Now reshape to (batch_size * n_stack, channels, height, width)
+        obs = obs.reshape(batch_size * n_stack, channels, height, width)
+
+        # Get features from CNN
+        features, state = super().forward(obs)
+
+        # Reshape features back to (batch_size, n_stack, feature_dim)
+        features = features.view(batch_size, n_stack, -1)
+
+        # Pass through RNN
         batch_size, seq_len, feat_dim = features.shape
 
         if state is None:
@@ -204,21 +210,29 @@ class DRQN(DQN):
             h_n = torch.zeros(self.rnn.num_layers, batch_size, self.rnn.hidden_size, device=self.device)
             c_n = torch.zeros(self.rnn.num_layers, batch_size, self.rnn.hidden_size, device=self.device)
         else:
-            h_n = state["h"]
-            c_n = state["c"]
+            h_n = state["hidden"].transpose(0, 1).contiguous()
+            c_n = state["cell"].transpose(0, 1).contiguous()
 
         out, (h_n, c_n) = self.rnn(features, (h_n, c_n))
 
         q = self.head(out.contiguous().view(batch_size * seq_len, -1))
+        q = q.view(batch_size, seq_len, -1)
 
-        state["h"] = h_n
-        state["c"] = c_n
-        
+        # Drop the sequence dimension for Q-values
+        q = q[:, -1, :]
+
+        state["hidden"] = h_n.transpose(0, 1).contiguous()
+        state["cell"] = c_n.transpose(0, 1).contiguous()
+
         return q, state
 
 class DTQN(DQN):
     """Deep Transformer Q-Network.
-    Uses a Transformer encoder over extracted visual features.
+    
+    Uses transformer architecture instead of LSTM for temporal processing.
+    Suitable for learning from sequences of observations.
+    For advanced usage (how to customize the network), please refer to
+    :ref:`build_the_network`.
     """
 
     def __init__(
@@ -226,28 +240,47 @@ class DTQN(DQN):
         state_shape: Box,
         action_shape: Discrete,
         device: Union[str, int, torch.device] = "cpu",
-        hidden_size: int = 256,
-        num_layers: int = 2,
-        nhead: int = 4,
-        dropout: float = 0.0,
+        hidden_size: int = 512,
+        num_heads: int = 8,
+        num_layers: int = 3,
+        dropout: float = 0.1,
+        context_length: int = 8,
     ) -> None:
-        # Extract features only from conv head
-        super().__init__(state_shape, action_shape, device, features_only=True)
+        n_channels, height, width = state_shape
+        channels = 3  # RGB
+        n_stack = n_channels // channels
+        temp_state_shape = (state_shape[0] // n_stack, state_shape[1], state_shape[2])
 
-        # Project feature dimension to transformer hidden size
-        self.input_proj = nn.Linear(self.output_dim, hidden_size)
-
+        super().__init__(temp_state_shape, action_shape, device, features_only=True)
+        
+        self.hidden_size = hidden_size
+        self.context_length = context_length
+        
+        # Project feature dimension to hidden_size
+        self.feature_proj = nn.Linear(self.output_dim, hidden_size)
+        
+        # Positional encoding
+        self.pos_encoding = nn.Parameter(
+            torch.zeros(1, context_length, hidden_size),
+            requires_grad=True
+        )
+        
+        # Transformer encoder
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=hidden_size,
-            nhead=nhead,
+            nhead=num_heads,
             dim_feedforward=hidden_size * 4,
             dropout=dropout,
-            activation="relu",
+            activation='relu',
             batch_first=True,
+            norm_first=False
         )
-        self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-
-        # Head maps the encoded representation to Q-values
+        self.transformer = nn.TransformerEncoder(
+            encoder_layer,
+            num_layers=num_layers
+        )
+        
+        # Output head
         self.head = nn.Linear(hidden_size, np.prod(action_shape))
         self.output_dim = np.prod(action_shape)
 
@@ -257,23 +290,40 @@ class DTQN(DQN):
         state: Optional[Any] = None,
         info: Dict[str, Any] = {},
     ) -> Tuple[torch.Tensor, Any]:
-        r"""Mapping: s -> Q(s, *).
-        Expects single-step inputs shaped like images; creates a sequence length 1 internally.
-        """
-        # Extract per-step features using conv head
-        features, _ = super().forward(obs)
+        r"""Mapping: s -> Q(s, \*)."""
+        batch_size, n_channels, height, width = obs.shape
+        channels = 3  # RGB
+        n_stack = n_channels // channels
+        obs = obs.reshape(batch_size, n_stack, channels, height, width)
 
-        # Create sequence length = 1 for transformer (B, S=1, D)
-        x = features.unsqueeze(1)
-        x = self.input_proj(x)
+        # Now reshape to (batch_size * n_stack, channels, height, width)
+        obs = obs.reshape(batch_size * n_stack, channels, height, width)
 
-        # For single-step, no mask is required; pass through encoder
-        # Output shape: (B, S=1, hidden_size)
-        enc = self.encoder(x)
-
-        # Use the last token (here the only token)
-        q = self.head(enc[:, -1, :])
-
+        # Get features from CNN
+        features, state = super().forward(obs)
+        
+        # Project features to hidden dimension
+        features = self.feature_proj(features)
+        
+        # Reshape features back to (batch_size, n_stack, hidden_size)
+        features = features.view(batch_size, n_stack, -1)
+        
+        # Pass through Transformer
+        batch_size, seq_len, feat_dim = features.shape
+        
+        # Add positional encoding
+        features = features + self.pos_encoding[:, :seq_len, :]
+        
+        # Apply transformer
+        # Note: Transformer expects (batch, seq, feature) with batch_first=True
+        transformer_out = self.transformer(features)
+        
+        # Take the last output for Q-value prediction
+        last_output = transformer_out[:, -1, :]
+        
+        # Compute Q-values
+        q = self.head(last_output)
+        
         return q, state
 
 class DuelingDQN(DQN):
@@ -320,43 +370,6 @@ class DuelingDQN(DQN):
         # probs = logits.softmax(dim=2)
         return probs, state
 
-
-class BaseConvNet(nn.Module):
-    """A base class for convolutional neural networks used in RL."""
-
-    def __init__(
-        self,
-        state_shape: Box,
-        labels_shape: int,
-        device: Union[str, int, torch.device] = "cpu"):
-        super(BaseConvNet, self).__init__()
-        self.device = device
-        self.conv_head = build_conv_head(state_shape[0])
-        self.flatten = nn.Flatten()
-        self.net = nn.Sequential(
-            self.conv_head,
-            self.flatten,
-        )
-
-        # Calculate output_dim correctly
-        with torch.no_grad():
-            dummy_input = torch.zeros(1, *state_shape)
-            self.output_dim = self.flatten(self.conv_head(dummy_input)).shape[1]
-
-        self.net = nn.Sequential(
-            self.net,
-            nn.Linear(self.output_dim, labels_shape),
-            nn.Sigmoid()
-        )
-        self.output_dim = labels_shape
-
-    def forward(
-        self,
-        obs: Union[np.ndarray, torch.Tensor],
-    ) -> torch.Tensor:
-        r"""Mapping: s -> Q(s, \*)."""
-        obs = torch.as_tensor(obs, device=self.device, dtype=torch.float32)
-        return self.net(obs)
 
 
 def build_conv_head(in_channels: int):

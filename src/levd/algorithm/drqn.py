@@ -18,6 +18,15 @@ class DRQNImpl(DQNImpl):
     def __init__(self, args: Namespace, log_path: str):
         super(DRQNImpl, self).__init__(args, log_path)
 
+    def create_buffer(self, n_buffers: int) -> ReplayBuffer:
+        return VectorReplayBuffer(
+            self.args.buffer_size,
+            buffer_num=n_buffers,
+            ignore_obs_next=True,
+            save_only_last_obs=True,
+            stack_num=self.args.frame_stack * 3
+        )
+
     def create_trainer(self, train_collector: Collector, test_collector: Collector, logger: BaseLogger) -> Dict[
         str, Union[float, str]]:
         return offpolicy_trainer(
