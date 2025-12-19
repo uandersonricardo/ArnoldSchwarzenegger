@@ -13,7 +13,7 @@ from levdoom.envs.dodge_projectiles.scenario import DodgeProjectiles
 from levdoom.envs.health_gathering.scenario import HealthGathering
 from levdoom.envs.seek_and_slay.scenario import SeekAndSlay
 from levdoom.envs.full_deathmatch.scenario import FullDeathmatch
-from levdoom.utils.wrappers import RescaleObservation, RGBStack
+from levdoom.utils.wrappers import RescaleObservation, RGBStack, GrayStack
 
 
 class Scenario(Enum):

@@ -32,6 +32,23 @@ class RGBStack(gymnasium.ObservationWrapper):
         n_stack, height, width, channels = observation.shape
         return np.transpose(observation, (0, 3, 1, 2)).reshape(n_stack * channels, height, width)
 
+class GrayStack(gymnasium.ObservationWrapper):
+    """Convert the stacked frames to grayscale. [n_stack, h, w, 3] -> [n_stack, h, w]"""
+
+    def __init__(self, env):
+        super(GrayStack, self).__init__(env)
+        n_stack, height, width, channels = self.observation_space.shape
+        new_shape = (n_stack, height, width)
+        self.observation_space = Box(
+            low=np.min(self.observation_space.low),
+            high=np.max(self.observation_space.high),
+            shape=new_shape
+        )
+
+    def observation(self, observation: ObsType) -> WrapperObsType:
+        gray_observations = np.dot(observation[..., :3], [0.2989, 0.5870, 0.1140])
+        return gray_observations.astype(observation.dtype)
+
 
 class WrapperHolder:
     """

@@ -21,17 +21,17 @@ class FullDeathmatch(DoomEnv):
     def __init__(self,
                  env: str,
                  base_reward: float = 0,
-                 distance_reward: float = 0.0,
+                 distance_reward: float = 0.001,
                  kill_reward: float = 5.0,
-                 death_reward: float = -3.0,
+                 death_reward: float = -5.0,
                  suicide_reward: float = -5.0,
-                 medikit_reward: float = 0.1,
-                 armor_reward: float = 0.1,
-                 hit_reward: float = 0.5,
-                 injured_reward: float = -0.1,
-                 weapon_reward: float = 0.15,
-                 ammo_reward: float = 0.05,
-                 use_ammo_reward: float = -0.001,
+                 medikit_reward: float = 0.5,
+                 armor_reward: float = 0.5,
+                 hit_reward: float = 1.0,
+                 injured_reward: float = -0.5,
+                 weapon_reward: float = 0.5,
+                 ammo_reward: float = 0.1,
+                 use_ammo_reward: float = -0.01,
                  label_enemy_reward: float = 0,
                  label_item_reward: float = 0,
                  label_none_reward: float = 0,
@@ -178,16 +178,15 @@ class FullDeathmatch(DoomEnv):
                     self.labels[type_id] = 1
 
     def get_available_actions(self) -> List[List[float]]:
-        # actions = []
-        # t_left_right = [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0]]
-        # m_forward = [[0.0], [1.0]]
-        # attack = [[0.0], [1.0]]
+        actions = []
+        t_left_right = [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0]]
+        m_forward = [[0.0], [1.0]]
+        attack = [[0.0], [1.0]]
 
-        # for t in t_left_right:
-        #     for m in m_forward:
-        #         for a in attack:
-        #             actions.append(t + m + a)
-        actions  = np.identity(4, dtype=int).tolist()
+        for t in t_left_right:
+            for m in m_forward:
+                for a in attack:
+                    actions.append(t + m + a)
         return actions
 
     def reward_wrappers_easy(self) -> List[WrapperHolder]:
@@ -279,7 +278,7 @@ class FullDeathmatch(DoomEnv):
         }
 
     def clear_episode_statistics(self):
-        if False:
+        if True:
             self.evaluate_episode()
 
         super().clear_episode_statistics()
@@ -355,7 +354,7 @@ class FullDeathmatch(DoomEnv):
         
     evaluating = True
     episode = 0
-    evaluations = (0, 0)
+    evaluations = (0, 0, 0, 0, 0)
     
     def evaluate_episode(self) -> float:
         if not self.game_variable_buffer or self.frames_survived == 0:
@@ -363,12 +362,20 @@ class FullDeathmatch(DoomEnv):
         self.episode += 1
         print(f"--- Episode {self.episode} statistics ---")
         print("Frames survived:", self.frames_survived)
-        print("Kills:", self.game_variable_buffer[-1][0])
+        print("Kills:", self.kills)
         print("Deaths:", 1)
-        print("K/D Ratio:", self.game_variable_buffer[-1][0] / 1)
-        self.evaluations = (self.evaluations[0] + self.game_variable_buffer[-1][0], self.evaluations[1] + 1)
+        print("Suicides:", self.suicides)
+        print("Items:", self.medikits + self.armors + self.ammo_found)
+        print("Weapons found:", self.pistol + self.shotgun + self.chaingun + self.rocket_launcher + self.plasma_rifle + self.bfg9000)
+        print("K/D Ratio:", self.kills / 1)
+        self.evaluations = (self.evaluations[0] + self.kills, self.evaluations[1] + 1, self.evaluations[2] + self.suicides,
+                            self.evaluations[3] + self.medikits + self.armors + self.ammo_found,
+                            self.evaluations[4] + self.pistol + self.shotgun + self.chaingun + self.rocket_launcher + self.plasma_rifle + self.bfg9000)
         print(f"--- Total {self.episode} statistics ---")
         print("Kills:", self.evaluations[0])
         print("Deaths:", self.evaluations[1])
         print("K/D Ratio:", self.evaluations[0] / self.evaluations[1])
+        print("Suicides:", self.evaluations[2])
+        print("Items:", self.evaluations[3])
+        print("Weapons found:", self.evaluations[4])
         print("")
