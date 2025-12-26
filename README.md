@@ -184,6 +184,8 @@ Arnold implementation follows the architecture from [Lample & Chaplot, 2016](htt
 
 **Key finding:** Auxiliary objectives improve dense combat but don't generalize uniformly across diverse maps.
 
+> **Note:** Full Deathmatch experiments with **Game Feature Prediction** and **Adaptive Movement Reward** are available in the [`matheusvtna/test-game-feat-net`](https://github.com/uandersonricardo/ArnoldSchwarzenegger/tree/matheusvtna/test-game-feat-net) branch.
+
 ## 🔬 Experimental Insights
 
 ### Why DTQN Outperforms DRQN
