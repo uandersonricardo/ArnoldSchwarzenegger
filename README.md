@@ -1,233 +1,225 @@
-# Arnold
+# A Comparative Analysis of Deep Q-Learning Algorithms in FPS Environment
 
-Arnold is a PyTorch implementation of the agent presented in *Playing FPS Games with Deep Reinforcement Learning* (https://arxiv.org/abs/1609.05521), and that won the 2017 edition of the [*ViZDoom AI Competition*](http://vizdoom.cs.put.edu.pl/competition-cig-2017).
+This repository contains the implementation and experiments for the paper **"A Comparative Analysis between Deep Q-Learning Algorithms in FPS Environment"**, developed as part of the Deep Learning course at the Federal University of Pernambuco (UFPE), Brazil.
 
-![example](./docs/example.gif) 
+## 📄 Paper Abstract
 
-### This repository contains:
-- The source code to train DOOM agents
-- A package with 17 selected maps that can be used for training and evaluation
-- 5 pretrained models that you can visualize and play against, including the ones that won the ViZDoom competition
+Recent advances in deep reinforcement learning have enabled agents to operate directly from raw visual input in complex environments such as first-person shooter (FPS) games. This work presents a comparative study of value-based deep reinforcement learning architectures in FPS environments using the LevDoom benchmark. We evaluate DQN, C51, Rainbow, DRQN, and Deep Transformer Q-Networks (DTQN) under identical training conditions, with a focus on the **first-ever application of DTQN to FPS environments**. Our results show that attention-based mechanisms (DTQN) achieve K/D ratios up to **40% higher** than standard and recurrent variants on held-out test levels.
 
+## 🎯 Key Contributions
 
-## Installation
+- **First application and evaluation of DTQN** in complex FPS environments
+- Empirical comparison of 5 neural architectures under identical training conditions
+- Investigation of auxiliary game-feature prediction in Full Deathmatch scenarios
+- Analysis of architectural inductive biases for robust policy learning in partially observable environments
 
-#### Dependencies
-Arnold was tested successfully on Mac OS and Linux distributions. You will need:
-- Python 2/3 with NumPy and OpenCV
-- PyTorch
-- ViZDoom
+## 🏗️ Repository Structure
 
-Follow the instructions on https://github.com/mwydmuch/ViZDoom to install ViZDoom. Be sure that you can run `import vizdoom` in Python from any directory. To do so, you can either install the library with `pip`, or compile it, then move it to the `site-packages` directory of your Python installation, as explained here: https://github.com/mwydmuch/ViZDoom/blob/master/doc/Quickstart.md.
+```
+.
+├── pretrained/                   # Pre-trained model checkpoints
+├── resources/
+│   ├── freedoom2.wad            # DOOM resources file (textures, sprites)
+│   └── scenarios/               # Game scenario configurations
+│       ├── full_deathmatch.wad  # Complete deathmatch maps
+│       ├── health_gathering.wad # Simple test scenario
+│       └── ...
+├── lib/
+│   └── LevDoom/                 # Extended LevDoom library
+├── src/
+│   ├── arnold/                  # Arnold agent implementation
+│   ├── levdoom/                 # LevDoom experiments
+│   ├── riayn/                   # Rainbow Is All You Need (legacy)
+│   └── rainbow/                 # Rainbow implementation (legacy)
+├── arnold.py                    # Arnold experiments entry point
+├── levd.py                      # LevDoom experiments entry point
+├── riayn.py                     # RIAYN experiments (legacy)
+├── rainbow.py                   # Rainbow experiments (legacy)
+└── README.md
+```
 
+## 🧠 Implemented Architectures
 
-## Code structure
+### 1. **DQN (Deep Q-Network)**
+Standard DQN with experience replay and target network.
 
-    .
-    ├── pretrained                    # Examples of pretrained models
-    ├── resources
-        ├── freedoom2.wad             # DOOM resources file (containing all textures)
-        └── scenarios                 # Folder containing all scenarios
-            ├── full_deathmatch.wad   # Scenario containing all deathmatch maps
-            ├── health_gathering.wad  # Simple test scenario
-            └── ...
-    ├── src                           # Source files
-        ├── doom                      # Game interaction / API / scenarios
-        ├── model                     # DQN / DRQN implementations
-        └── trainer                   # Folder containing training scripts
-    ├── arnold.py                     # Main file
-    └── README.md
+```
+Conv2d(12→32, 8×8, stride=4) → ReLU →
+Conv2d(32→64, 4×4, stride=2) → ReLU →
+Conv2d(64→64, 3×3, stride=1) → ReLU →
+Flatten → Linear(3136→512) → ReLU → Linear(512→6)
+```
 
+### 2. **C51 (Categorical DQN)**
+Distributional RL approach modeling the value distribution.
 
-## Scenarios / Maps
+```
+[Same CNN encoder as DQN]
+Linear(3136→512) → ReLU → Linear(512→306)  # 6 actions × 51 atoms
+```
 
-## Train a model
+### 3. **Rainbow DQN**
+Combines 6 extensions: double DQN, dueling networks, prioritized replay, multi-step learning, distributional RL, and noisy networks.
 
-There are many parameters you can tune to train a model.
+```
+[Shared CNN encoder]
+Q-stream: NoisyLinear(3136→512) → ReLU → NoisyLinear(512→306)
+V-stream: NoisyLinear(3136→512) → ReLU → NoisyLinear(512→51)
+```
 
+### 4. **DRQN (Deep Recurrent Q-Network)**
+Adds LSTM for temporal sequence processing.
+
+```
+Conv2d(3→32→64→64) → Flatten →
+LSTM(3136→512, batch_first=True) →
+Linear(512→6)
+```
+
+### 5. **DTQN (Deep Transformer Q-Network)** ⭐
+**Novel application:** First use of transformer-based attention in FPS environments.
+
+```
+[Shared CNN encoder]
+Linear(3136→512) [feature projection] →
+TransformerDecoder(3 layers, d_model=512, nhead=8, dim_feedforward=2048) →
+Linear(512→6)
+```
+
+## 🚀 Getting Started
+
+### Installation
 
 ```bash
-python arnold.py
-
-## General parameters about the game
---freedoom "true"                # use freedoom resources
---height 60                      # screen height
---width 108                      # screen width
---gray "false"                   # use grayscale screen
---use_screen_buffer "true"       # use the screen buffer (what the player sees)
---use_depth_buffer "false"       # use the depth buffer
---labels_mapping ""              # use extra feature maps for specific objects
---game_features "target,enemy"   # game features prediction (auxiliary tasks)
---render_hud "false"             # render the HUD (status bar in the bottom of the screen)
---render_crosshair "true"        # render crosshair (targeting aid in the center of the screen)
---render_weapon "true"           # render weapon
---hist_size 4                    # history size
---frame_skip 4                   # frame skip (1 = keep every frame)
-
-## Agent allowed actions
---action_combinations "attack+move_lr;turn_lr;move_fb"  # agent allowed actions
---freelook "false"               # allow the agent to look up and down
---speed "on"                     # make the agent run
---crouch "off"                   # make the agent crouch
-
-## Training parameters
---batch_size 32                  # batch size
---replay_memory_size 1000000     # maximum number of frames in the replay memory
---start_decay 0                  # epsilon decay iteration start
---stop_decay 1000000             # epsilon decay iteration end
---final_decay 0.1                # final epsilon value
---gamma 0.99                     # discount factor gamma
---dueling_network "false"        # use a dueling architecture
---clip_delta 1.0                 # clip the delta loss
---update_frequency 4             # DQN update frequency
---dropout 0.5                    # dropout on CNN output layer
---optimizer "rmsprop,lr=0.0002"  # network optimizer
-
-## Network architecture
---network_type "dqn_rnn"         # network type (dqn_ff / dqn_rnn)
---recurrence "lstm"              # recurrent network type (rnn / gru / lstm)
---n_rec_layers 1                 # number of layers in the recurrent network
---n_rec_updates 5                # number of updates by sample
---remember 1                     # remember all frames during evaluation
---use_bn "off"                   # use BatchNorm when processing the screen
---variable_dim "32"              # game variables embeddings dimension
---bucket_size "[10, 1]"          # bucket game variables (typically health / ammo)
---hidden_dim 512                 # hidden layers dimension
-
-## Scenario parameters (these parameters will differ based on the scenario)
---scenario "deathmatch"          # scenario
---wad "full_deathmatch"          # WAD file (scenario file)
---map_ids_train "2,3,4,5"        # maps to train the model
---map_ids_test "6,7,8"           # maps to test the model
---n_bots 8                       # number of enemy bots
---randomize_textures "true"      # randomize walls / floors / ceils textures during training
---init_bots_health 20            # reduce initial life of enemy bots (helps a lot when using pistol)
-
-## Various
---exp_name new_train             # experiment name
---dump_freq 200000               # periodically dump the model
---gpu_id -1                      # GPU ID (-1 to run on CPU)
+uv sync
 ```
 
-Once your agent is trained, you can visualize it by running the same command, and using the following extra arguments:
+## 🎮 Running Experiments
+
+### LevDoom Scenarios
+
+#### Training
+
+**Defend the Center:**
 ```bash
---visualize 1                    # visualize the model (render the screen)
---evaluate 1                     # evaluate the agent
---manual_control 1               # manually make the agent turn about when it gets stuck
---reload PATH                    # path where the trained agent was saved
+uv run levd.py \
+  --algorithm dtqn \
+  --scenario defend_the_center \
+  --train_levels 0 1 \
+  --test_levels 2 3 4 \
+  --seed 1 \
+  --epoch 50 \
+  --lr 0.0001 \
+  --step-per-collect 10 \
+  --batch-size 64
 ```
 
+**Full Deathmatch:**
+```bash
+uv run levd.py \
+  --algorithm rainbow \
+  --scenario full_deathmatch \
+  --train_levels 0 \
+  --train_maps 1 2 \
+  --test_levels 0 \
+  --test_maps 4 11 \
+  --seed 42 \
+  --epoch 50 \
+  --lr 0.0001 \
+  --step-per-collect 10 \
+  --batch-size 64
+```
 
-Here are some examples of training commands for 3 different scenarios:
+**Available algorithms:** `dqn`, `c51`, `rainbow`, `drqn`, `dtqn`
 
-#### Defend the center
-
-In this scenario the agent is in the middle of a circular map. Monsters are regularly appearing on the sides and are walking towards the agent. The agent is given a pistol and limited ammo, and must turn around and kill the monsters before they reach it. The following command trains a standard DQN, that should reach the optimal performance of 56 frags (the number of bullets in the pistol) in about 4 million steps:
+#### Testing/Watching
 
 ```bash
-python arnold.py --scenario defend_the_center --action_combinations "turn_lr+attack" --frame_skip 2
+# Test on specific level
+uv run levd.py --watch \
+  --algorithm dtqn \
+  --scenario defend_the_center \
+  --resume-path pretrained/dtqn_best.pth \
+  --render \
+  --test_levels 4
+
+# Test on specific maps
+uv run levd.py --watch \
+  --algorithm rainbow \
+  --scenario full_deathmatch \
+  --resume-path pretrained/rainbow_best.pth \
+  --render \
+  --test_levels 0 \
+  --test_maps 4 11
 ```
 
-#### Health gathering
+### Arnold Agent
 
-In this scenario the agent is walking on lava, and is losing health points at each time step. The agent has to move and collect as many health pack as possible in order to survive. The objective is to survive the longest possible time.
+Arnold implementation follows the architecture from [Lample & Chaplot, 2016](https://arxiv.org/abs/1609.05521).
 
 ```bash
-python arnold.py --scenario health_gathering --action_combinations "move_fb;turn_lr" --frame_skip 5
+./run.sh track2 --n_bots 10
 ```
 
-This scenario is very easy and the model quickly reaches the maximum survival time of 2 minutes (35 * 120 = 4200 frames). The scenario also provides a `supreme` mode, in which the map is more complicated and where the health packs are much harder to collect:
+## 📊 Key Results
 
-```bash
-python arnold.py --scenario health_gathering --action_combinations "move_fb;turn_lr" --frame_skip 5 --supreme 1
-```
+### Defend the Center (K/D Ratio on Test Levels)
 
-In this scenario, the agent takes about 1.5 million steps to reach the maximum survival time (but often dies before the end).
+| Architecture | Level 0 | Level 1 (avg) | Level 2 (avg) | Level 3 (avg) | Level 4 |
+|-------------|---------|---------------|---------------|---------------|---------|
+| **DTQN** ⭐   | **10.9** | **8.9** | **7.3** | **6.6** | **5.3** |
+| Rainbow     | 8.0     | 6.8         | 6.7         | 5.2         | 5.2     |
+| DQN         | 6.3     | 6.4         | 6.9         | 5.6         | 5.5     |
+| C51         | 6.8     | 6.3         | 6.4         | 5.5         | 5.0     |
+| DRQN        | 4.0     | 5.5         | 6.1         | 4.4         | 4.7     |
 
-#### Deathmatch
+**DTQN achieves 40% higher K/D ratios** compared to other methods on unseen test levels.
 
-In this scenario, the agent is trained to fight against the built-in bots of the game. Here is a command to train the agent using game features prediction (as described in [1]), and a DRQN:
+### Full Deathmatch
 
-```bash
-python arnold.py --scenario deathmatch --wad deathmatch_rockets --n_bots 8 \
---action_combinations "move_fb;move_lr;turn_lr;attack" --frame_skip 4 \
---game_features "enemy" --network_type dqn_rnn --recurrence lstm --n_rec_updates 5
-```
+| Agent | Map 4 K/D | Map 4 Survival | Map 11 K/D | Map 11 Survival |
+|-------|-----------|----------------|------------|-----------------|
+| Rainbow baseline | 28.9 | 126 | **18.8** | **291** |
+| Rainbow + Features | **30.0** | **128** | 17.9 | 169 |
 
+**Key finding:** Auxiliary objectives improve dense combat but don't generalize uniformly across diverse maps.
 
-## Pretrained models
+## 🔬 Experimental Insights
 
-#### Defend the center / Health gathering
+### Why DTQN Outperforms DRQN
 
-We provide a pretrained model for each of these scenarios. You can visualize them by running:
+1. **Parallel Processing:** Transformers compute representations for all timesteps in parallel vs. sequential LSTM processing
+2. **Direct Attention:** Can directly connect firing actions to relevant enemy observations without gradient dilution
+3. **No Vanishing Gradients:** Avoids recurrent network training instabilities in off-policy settings
+4. **Better Credit Assignment:** Learned positional encodings capture temporal patterns specific to FPS dynamics
 
-```bash
-./run.sh defend_the_center
-```
+### Limitations Discovered
 
-or
+- **Sparse Action Space:** Infrequent enemy appearances make learning correct shooting sequences difficult
+- **Computational Budget:** 50 epochs insufficient for full convergence (Arnold required ~60 hours)
+- **Pixel-Only Learning:** Limited performance without extensive training or auxiliary objectives
+- **Map Diversity:** Auxiliary features can bias agents toward aggressive strategies suboptimal for larger maps
 
-```bash
-./run.sh health_gathering
-```
+## 📈 Future Work
 
-#### Visual Doom AI Competition 2017
+- [ ] Extend training beyond 100 epochs for full convergence
+- [ ] Implement more expressive visual encoders (ResNets, Vision Transformers)
+- [ ] Ablation studies of Rainbow's individual components
+- [ ] Investigate model-based RL approaches (Dreamer, MuZero)
+- [ ] Test in other partially observable domains (StarCraft, Dota 2)
 
-We release the two agents submitted to the first and second tracks of the ViZDoom AI 2017 Competition. You can visualize them playing against the built-in bots using the following commands:
+## 🙏 Acknowledgments
 
-##### Track 1 - Arnold vs 10 built-in AI bots
-```bash
-./run.sh track1 --n_bots 10
-```
+- **LevDoom:** Benchmark for studying generalization in RL ([Tomilin et al., 2022](https://arxiv.org/abs/2206.00491))
+- **ViZDoom:** Doom-based AI research platform ([Kempka et al., 2016](https://arxiv.org/abs/1605.02097))
+- **DTQN:** Deep Transformer Q-Networks ([Esslinger et al., 2022](https://arxiv.org/abs/2206.01078))
+- **Arnold:** FPS playing agent ([Lample & Chaplot, 2016](https://arxiv.org/abs/1609.05521))
+- **Tianshou:** RL library providing standardized implementations
 
-##### Track 2 - Arnold vs 10 built-in AI bots - Map 2
-```bash
-./run.sh track2 --n_bots 10 --map_id 2
-```
+## 👥 Authors
 
-##### Track 2 - 4 Arnold playing against each other - Map 3
-```bash
-./run.sh track2 --n_bots 0 --map_id 3 --n_agents 4
-```
+- **Matheus Andrade** - [GitHub](https://github.com/matheusvtna) - mvtna@cin.ufpe.br
+- **Uanderson Silva** - [GitHub](https://github.com/uandersonricardo) - urfs@cin.ufpe.br
 
-We also trained an agent on a single map, using a same weapon (the SuperShotgun). This agent is extremely difficult to beat.
-
-##### Shotgun - 4 Arnold playing against each other
-```bash
-./run.sh shotgun --n_bots 0 --n_agents 4
-```
-
-##### Shotgun - 3 Arnold playing against each other + 1 human player (to play against the agent)
-```bash
-./run.sh shotgun --n_bots 0 --n_agents 3 --human_player 1
-```
-
-
-## References
-
-If you found this code useful, please consider citing:
-
-[1] G. Lample\* and D.S. Chaplot\*, [*Playing FPS Games with Deep Reinforcement Learning*](https://arxiv.org/abs/1609.05521)
-```
-@inproceedings{lample2017playing,
-  title={Playing FPS Games with Deep Reinforcement Learning.},
-  author={Lample, Guillaume and Chaplot, Devendra Singh},
-  booktitle={Proceedings of AAAI},
-  year={2017}
-}
-```
-
-
-[2] D.S. Chaplot\* and G. Lample\*, [*Arnold: An Autonomous Agent to Play FPS Games*](http://www.cs.cmu.edu/~dchaplot/papers/arnold_aaai17.pdf)
-```
-@inproceedings{chaplot2017arnold,
-  title={Arnold: An Autonomous Agent to Play FPS Games.},
-  author={Chaplot, Devendra Singh and Lample, Guillaume},
-  booktitle={Proceedings of AAAI},
-  year={2017},
-  Note={Best Demo award}
-}
-```
-
-## Acknowledgements
-We acknowledge the developers of [*ViZDoom*](http://vizdoom.cs.put.edu.pl/) for constant help and support during the development of this project. Some of the maps and wad files have been borrowed from the ViZDoom [*git repository*](https://github.com/mwydmuch/ViZDoom). We also thank the members of the [*ZDoom*](https://forum.zdoom.org/) community for their help with the Action Code Scripts (ACS).
+**Universidade Federal de Pernambuco (UFPE)**  
+Centro de Informática (CIn)

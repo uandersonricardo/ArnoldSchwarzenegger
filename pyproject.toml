@@ -3,10 +3,23 @@ name = "arnold"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
+    "gymnasium>=1.2.1",
+    # "levdoom>=1.0.3",
+    "matplotlib>=3.10.7",
     "opencv-python>=4.12.0.88",
+    "segment-tree>=0.3.2",
+    "tensorboard>=2.20.0",
+    "tensorboardx>=2.6.4",
+    "tianshou>=0.5.1",
     "torch>=2.9.0",
     "torchvision>=0.24.0",
-    "vizdoom>=1.2.4",
+    "vizdoom>=1.3.0.dev3",
+    "levdoom",
+    "scikit-image>=0.25.2",
+    "pandas>=2.3.3",
 ]
+
+[tool.uv.sources]
+levdoom = { path = "./libs/LevDoom", editable = true }

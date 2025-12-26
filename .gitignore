@@ -3,3 +3,10 @@ __pycache__/
 *.py[cod]
 _vizdoom.ini
 dumped/
+experiments/
+.venv/
+runs/
+checkpoints/
+log/
+tf_checkpoints/
+src/rbdoom/
